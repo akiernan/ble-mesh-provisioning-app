@@ -48,22 +48,12 @@ final class ProvisioningViewModel {
             currentIndex = index
             meshService.provisioningStates[device.id] = .inProgress(progress: 0)
 
-            // Animate progress while provisioning
-            let progressTask = Task {
-                for step in 1...5 {
-                    try? await Task.sleep(for: .milliseconds(400))
-                    meshService.provisioningStates[device.id] = .inProgress(progress: Double(step) / 5.0)
-                }
-            }
-
             do {
                 let node = try await meshService.provisionDevice(device)
-                progressTask.cancel()
                 meshService.provisionedNodes.append(node)
                 meshService.provisioningStates[device.id] = .completed
                 completedCount += 1
             } catch {
-                progressTask.cancel()
                 meshService.provisioningStates[device.id] = .failed(error.localizedDescription)
                 errorMessage = error.localizedDescription
             }
