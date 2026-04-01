@@ -543,7 +543,22 @@ final class MeshNetworkService: NSObject {
             return
         }
 
-        // Query GenericOnOff state
+        guard let appKey = manager.meshNetwork?.applicationKeys.first else { return }
+
+        // Bind the app key to local client models (persisted after first run)
+        let localElement = manager.localElements.first
+        let clientModelIds: [UInt16] = [.genericOnOffClientModelId, .lightCTLClientModelId]
+        for modelId in clientModelIds {
+            if let model = localElement?.model(withSigModelId: modelId),
+               !model.boundApplicationKeys.contains(where: { $0.index == appKey.index }) {
+                if let bind = ConfigModelAppBind(applicationKey: appKey, to: model) {
+                    _ = try? await manager.sendToLocalNode(bind)
+                }
+            }
+        }
+        _ = manager.save()
+
+        // Query GenericOnOff state from the first provisioned node
         if let onOffModel = node.elements.lazy
             .compactMap({ $0.model(withSigModelId: .genericOnOffServerModelId) }).first {
             do {
@@ -763,6 +778,19 @@ extension MeshNetworkService: MeshNetworkDelegate {
         }
         if let status = message as? ConfigStatusMessage {
             logger.info("📩 Config status: \(status.isSuccess ? "success" : "failed"): \(status.message)")
+        }
+        // Update group state from device status responses
+        Task { @MainActor in
+            if let status = message as? GenericOnOffStatus {
+                logger.info("🔄 OnOff state: \(status.isOn ? "ON" : "OFF")")
+                self.currentGroup?.isOn = status.isOn
+            }
+            if let status = message as? LightCTLStatus {
+                let lightness = Double(status.lightness) / 65535.0
+                logger.info("🔄 CTL state: lightness=\(Int(lightness * 100))%, temp=\(status.temperature)K")
+                self.currentGroup?.lightness = lightness
+                self.currentGroup?.temperature = status.temperature
+            }
         }
     }
 
