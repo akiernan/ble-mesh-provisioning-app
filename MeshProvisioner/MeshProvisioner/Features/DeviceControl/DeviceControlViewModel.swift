@@ -31,8 +31,15 @@ final class DeviceControlViewModel {
     }
 
     func connectIfNeeded() {
-        guard !meshService.isConnectedToProxy else { return }
-        Task { try? await meshService.connectToProxy() }
+        Task {
+            do {
+                try await meshService.connectToProxy()
+            } catch {
+                errorMessage = "Proxy connection failed: \(error.localizedDescription)"
+                return
+            }
+            await meshService.fetchCurrentState()
+        }
     }
 
     func togglePower() {

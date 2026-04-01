@@ -68,11 +68,16 @@ final class MeshNetworkService: NSObject {
         manager.delegate = self
         manager.logger = self
         setupMeshNetwork()
-        // CRITICAL: Setting localElements triggers the setter which installs
-        // ConfigurationClientHandler (and other foundation model delegates).
-        // Without this, config responses (AppKeyStatus, CompositionDataStatus, etc.)
-        // are decoded as UnknownMessage and manager.send() never completes.
-        manager.localElements = []
+        // Setting localElements triggers the setter which installs foundation
+        // model delegates (ConfigurationClientHandler, etc.) AND our client model
+        // delegates for decoding GenericOnOffStatus / LightCTLStatus responses.
+        let clientDelegate = LightControlClientDelegate()
+        manager.localElements = [
+            Element(name: "Primary Element", location: .unknown, models: [
+                Model(sigModelId: .genericOnOffClientModelId, delegate: clientDelegate),
+                Model(sigModelId: .lightCTLClientModelId, delegate: clientDelegate),
+            ])
+        ]
     }
 
     // MARK: - Network Setup
@@ -447,15 +452,24 @@ final class MeshNetworkService: NSObject {
 
     /// Scans for a GATT proxy node, connects, and waits until the bearer is open.
     func connectToProxy() async throws {
-        guard bluetoothState == .poweredOn else {
-            throw AppError.bluetoothUnavailable
-        }
         guard manager.meshNetwork != nil else {
             throw AppError.networkNotReady
         }
 
         // Already connected – nothing to do
         if isConnectedToProxy { return }
+
+        // Wait for Bluetooth to be ready (CBCentralManager starts as .unknown)
+        if bluetoothState != .poweredOn {
+            logger.info("Waiting for Bluetooth to power on...")
+            for _ in 0..<50 { // up to 5 seconds
+                try await Task.sleep(for: .milliseconds(100))
+                if bluetoothState == .poweredOn { break }
+            }
+            guard bluetoothState == .poweredOn else {
+                throw AppError.bluetoothUnavailable
+            }
+        }
 
         // Scan for proxy nodes
         scannerCentralManager.scanForPeripherals(
@@ -509,6 +523,55 @@ final class MeshNetworkService: NSObject {
                                                 temperature: clampedTemp,
                                                 deltaUV: 0)
         try? await manager.send(message, to: dest, using: appKey)
+    }
+
+    // MARK: - State Query
+
+    /// Queries a provisioned node for its current on/off and CTL state,
+    /// updating `currentGroup` to reflect the real device values.
+    func fetchCurrentState() async {
+        guard let node = provisionedNodes.first else { return }
+
+        // The proxy filter setup (beacon exchange, SetFilterType, AddAddressesToFilter)
+        // happens asynchronously after bearerDidOpen. Wait for it to complete.
+        for _ in 0..<30 { // up to 3 seconds
+            if manager.proxyFilter.proxy != nil { break }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        guard manager.proxyFilter.proxy != nil else {
+            logger.warning("🔄 Proxy filter not ready — skipping state query")
+            return
+        }
+
+        // Query GenericOnOff state
+        if let onOffModel = node.elements.lazy
+            .compactMap({ $0.model(withSigModelId: .genericOnOffServerModelId) }).first {
+            do {
+                let response = try await manager.send(GenericOnOffGet(), to: onOffModel)
+                if let status = response as? GenericOnOffStatus {
+                    logger.info("🔄 OnOff state: \(status.isOn ? "ON" : "OFF")")
+                    currentGroup?.isOn = status.isOn
+                }
+            } catch {
+                logger.warning("🔄 Failed to query OnOff state: \(error)")
+            }
+        }
+
+        // Query LightCTL state
+        if let ctlModel = node.elements.lazy
+            .compactMap({ $0.model(withSigModelId: .lightCTLServerModelId) }).first {
+            do {
+                let response = try await manager.send(LightCTLGet(), to: ctlModel)
+                if let status = response as? LightCTLStatus {
+                    let lightness = Double(status.lightness) / 65535.0
+                    logger.info("🔄 CTL state: lightness=\(Int(lightness * 100))%, temp=\(status.temperature)K")
+                    currentGroup?.lightness = lightness
+                    currentGroup?.temperature = status.temperature
+                }
+            } catch {
+                logger.warning("🔄 Failed to query CTL state: \(error)")
+            }
+        }
     }
 }
 
@@ -777,6 +840,45 @@ private final class OnceGate: @unchecked Sendable {
         guard !passed else { return false }
         passed = true
         return true
+    }
+}
+
+// MARK: - LightControlClientDelegate
+
+/// Model delegate for local GenericOnOff Client and LightCTL Client models.
+/// Registers the response opcodes so the library decodes status messages
+/// instead of returning UnknownMessage.
+private class LightControlClientDelegate: ModelDelegate {
+    let messageTypes: [UInt32: MeshMessage.Type]
+    let isSubscriptionSupported = false
+    let publicationMessageComposer: MessageComposer? = nil
+
+    init() {
+        self.messageTypes = [
+            GenericOnOffStatus.opCode: GenericOnOffStatus.self,
+            LightCTLStatus.opCode: LightCTLStatus.self,
+        ]
+    }
+
+    func model(_ model: Model,
+               didReceiveAcknowledgedMessage request: AcknowledgedMeshMessage,
+               from source: Address,
+               sentTo destination: MeshAddress) throws -> MeshResponse {
+        fatalError("Client model does not handle acknowledged requests")
+    }
+
+    func model(_ model: Model,
+               didReceiveUnacknowledgedMessage message: UnacknowledgedMeshMessage,
+               from source: Address,
+               sentTo destination: MeshAddress) {
+        // Nothing to do
+    }
+
+    func model(_ model: Model,
+               didReceiveResponse response: MeshResponse,
+               toAcknowledgedMessage request: AcknowledgedMeshMessage,
+               from source: Address) {
+        // Response handled by the async send() caller
     }
 }
 
