@@ -68,6 +68,11 @@ final class MeshNetworkService: NSObject {
         manager.delegate = self
         manager.logger = self
         setupMeshNetwork()
+        // CRITICAL: Setting localElements triggers the setter which installs
+        // ConfigurationClientHandler (and other foundation model delegates).
+        // Without this, config responses (AppKeyStatus, CompositionDataStatus, etc.)
+        // are decoded as UnknownMessage and manager.send() never completes.
+        manager.localElements = []
     }
 
     // MARK: - Network Setup
@@ -80,17 +85,26 @@ final class MeshNetworkService: NSObject {
                     withName: "Zuma Network",
                     by: deviceName
                 )
-                let netKey = try network.add(
-                    networkKey: Data.random128BitKey(),
-                    withIndex: 0,
-                    name: "Primary Network Key"
-                )
-                let appKey = try network.add(
-                    applicationKey: Data.random128BitKey(),
-                    withIndex: 0,
-                    name: "Light CTL App Key"
-                )
-                try appKey.bind(to: netKey)
+                // createNewMeshNetwork adds a default net key at index 0.
+                // Only add our own if none exists.
+                let netKey: NetworkKey
+                if let existing = network.networkKeys.first {
+                    netKey = existing
+                } else {
+                    netKey = try network.add(
+                        networkKey: Data.random128BitKey(),
+                        withIndex: 0,
+                        name: "Primary Network Key"
+                    )
+                }
+                if network.applicationKeys.isEmpty {
+                    let appKey = try network.add(
+                        applicationKey: Data.random128BitKey(),
+                        withIndex: 0,
+                        name: "Light CTL App Key"
+                    )
+                    try appKey.bind(to: netKey)
+                }
             }
             _ = manager.save()
             restoreStateFromNetwork()
@@ -307,29 +321,65 @@ final class MeshNetworkService: NSObject {
         try await Task.sleep(for: .milliseconds(300))
         keyBindingStepStates[.generateKey] = .completed
 
-        // Step 2: Distribute keys – send ConfigAppKeyAdd to each node
+        // Step 2: Distribute keys – fetch composition data then send ConfigAppKeyAdd
         keyBindingStepStates[.distributeKeys] = .inProgress
         for node in nodes {
+            logger.info("🔧 Processing node: \(node.name ?? "unknown"), unicast: 0x\(String(node.primaryUnicastAddress, radix: 16)), elements: \(node.elements.count)")
+            logger.info("🔧 Proxy connected: \(self.isConnectedToProxy), transmitter: \(self.manager.transmitter != nil), bearer: \(self.proxyBearer != nil)")
+
+            // Fetch composition data so we know the node's elements and models.
+            // After provisioning, elements exist (from capabilities) but have no models.
+            // We need composition data to populate model info on each element.
+            let hasModels = node.elements.contains { !$0.models.isEmpty }
+            if !hasModels {
+                logger.info("🔧 Sending ConfigCompositionDataGet to node 0x\(String(node.primaryUnicastAddress, radix: 16)) (\(node.elements.count) elements, no models)...")
+                let compositionGet = ConfigCompositionDataGet(page: 0)
+                await withTimeout(.seconds(10)) { [manager] in
+                    logger.info("🔧 manager.send(CompositionDataGet) — awaiting response...")
+                    let response = try await manager.send(compositionGet, to: node)
+                    logger.info("🔧 CompositionDataGet response: \(type(of: response))")
+                }
+                try? await Task.sleep(for: .milliseconds(500))
+                logger.info("🔧 After CompositionDataGet — node elements: \(node.elements.count)")
+                for (i, element) in node.elements.enumerated() {
+                    let modelNames = element.models.map { "0x\(String($0.modelId, radix: 16))" }.joined(separator: ", ")
+                    logger.info("🔧   Element[\(i)] addr=0x\(String(element.unicastAddress, radix: 16)) models=[\(modelNames)]")
+                }
+            } else {
+                logger.info("🔧 Node already has composition data (\(node.elements.count) elements)")
+            }
+
+            logger.info("🔧 Sending ConfigAppKeyAdd to node 0x\(String(node.primaryUnicastAddress, radix: 16))...")
             let request = ConfigAppKeyAdd(applicationKey: appKey)
-            await withTimeout { [manager] in _ = try await manager.send(request, to: node) }
+            await withTimeout { [manager] in
+                let response = try await manager.send(request, to: node)
+                logger.info("🔧 AppKeyAdd response: \(type(of: response))")
+            }
             try? await Task.sleep(for: .milliseconds(200))
         }
         keyBindingStepStates[.distributeKeys] = .completed
 
-        // Step 3: Configure LightCTL model binding on each node
+        // Step 3: Configure model binding on each node
         keyBindingStepStates[.configureModels] = .inProgress
         for node in nodes {
-            for element in node.elements {
-                if let model = element.model(withSigModelId: SIGModelID.lightCTLServer) {
+            let hasModels = node.elements.contains { !$0.models.isEmpty }
+            if !hasModels {
+                logger.warning("🔧 Node \(node.name ?? "unknown") has no models — skipping model bind")
+                continue
+            }
+            for (i, element) in node.elements.enumerated() {
+                let modelNames = element.models.map { "0x\(String($0.modelId, radix: 16))" }.joined(separator: ", ")
+                logger.info("🔧 Element[\(i)] models: [\(modelNames)]")
+                for model in element.models {
+                    // Bind app key to every non-config SIG model
+                    let modelId = model.modelId
+                    guard modelId != 0x0000 && modelId != 0x0001 else { continue } // skip config server/client
                     if let bindMsg = ConfigModelAppBind(applicationKey: appKey, to: model) {
-                        await withTimeout { [manager] in _ = try await manager.send(bindMsg, to: node) }
-                        try? await Task.sleep(for: .milliseconds(200))
-                    }
-                }
-                // Also bind GenericOnOff for on/off control
-                if let model = element.model(withSigModelId: SIGModelID.genericOnOffServer) {
-                    if let bindMsg = ConfigModelAppBind(applicationKey: appKey, to: model) {
-                        await withTimeout { [manager] in _ = try await manager.send(bindMsg, to: node) }
+                        logger.info("🔧 Binding app key to model 0x\(String(modelId, radix: 16)) on element \(i)")
+                        await withTimeout { [manager] in
+                            let response = try await manager.send(bindMsg, to: node)
+                            logger.info("🔧 ModelAppBind response: \(type(of: response))")
+                        }
                         try? await Task.sleep(for: .milliseconds(200))
                     }
                 }
@@ -363,13 +413,14 @@ final class MeshNetworkService: NSObject {
             }
         }
 
-        // Subscribe each node's CTL + OnOff models to the group
+        // Subscribe each node's non-config models to the group
         for node in nodes {
             for element in node.elements {
-                let modelIDs: [UInt16] = [SIGModelID.lightCTLServer, SIGModelID.genericOnOffServer]
-                for modelID in modelIDs {
-                    if let model = element.model(withSigModelId: modelID),
-                       let msg = ConfigModelSubscriptionAdd(group: group, to: model) {
+                for model in element.models {
+                    let modelId = model.modelId
+                    guard modelId != 0x0000 && modelId != 0x0001 else { continue }
+                    if let msg = ConfigModelSubscriptionAdd(group: group, to: model) {
+                        logger.info("🔧 Subscribing model 0x\(String(modelId, radix: 16)) to group \(name)")
                         await withTimeout { [manager] in _ = try await manager.send(msg, to: node) }
                         try? await Task.sleep(for: .milliseconds(200))
                     }
@@ -518,16 +569,19 @@ extension MeshNetworkService: CBCentralManagerDelegate {
 
     @MainActor
     private func connectToProxyPeripheral(_ peripheral: CBPeripheral) {
+        logger.info("🔌 Connecting to proxy peripheral: \(peripheral.identifier)")
         let bearer = GattBearer(targetWithIdentifier: peripheral.identifier)
         bearer.logger = self
         bearer.delegate = self
         bearer.dataDelegate = manager
         proxyBearer = bearer
         manager.transmitter = bearer
+        logger.info("🔌 Bearer delegate: \(bearer.delegate != nil), dataDelegate: \(bearer.dataDelegate != nil), transmitter: \(self.manager.transmitter != nil)")
         do {
             try bearer.open()
+            logger.info("🔌 Bearer.open() called successfully")
         } catch {
-            logger.error("Failed to open proxy bearer: \(error)")
+            logger.error("🔌 Failed to open proxy bearer: \(error)")
         }
     }
 }
@@ -539,11 +593,13 @@ extension MeshNetworkService: BearerDelegate {
         Task { @MainActor in
             if bearer === proxyBearer {
                 isConnectedToProxy = true
-                logger.info("Connected to proxy")
+                logger.info("🟢 Proxy bearer OPENED — bearer type: \(type(of: bearer)), transmitter set: \(self.manager.transmitter != nil)")
                 if let cont = proxyConnectionContinuation {
                     proxyConnectionContinuation = nil
                     cont.resume()
                 }
+            } else {
+                logger.info("🟢 Bearer opened but NOT proxy bearer (type: \(type(of: bearer)))")
             }
         }
     }
@@ -554,7 +610,7 @@ extension MeshNetworkService: BearerDelegate {
                 isConnectedToProxy = false
                 proxyBearer = nil
                 manager.transmitter = nil
-                logger.info("Proxy disconnected")
+                logger.info("🔴 Proxy bearer CLOSED — error: \(error?.localizedDescription ?? "none")")
                 // If we were still waiting on connection, report the failure
                 if let cont = proxyConnectionContinuation {
                     proxyConnectionContinuation = nil
@@ -638,14 +694,20 @@ extension MeshNetworkService: MeshNetworkDelegate {
                                          didReceiveMessage message: MeshMessage,
                                          sentFrom source: Address,
                                          to destination: MeshAddress) {
-        // Handle status responses if needed
+        logger.info("📩 RECEIVED \(type(of: message)) from 0x\(String(source, radix: 16)) to 0x\(String(destination.address, radix: 16))")
+        if message is ConfigCompositionDataStatus {
+            logger.info("📩 Got composition data response!")
+        }
+        if let status = message as? ConfigStatusMessage {
+            logger.info("📩 Config status: \(status.isSuccess ? "success" : "failed"): \(status.message)")
+        }
     }
 
     nonisolated func meshNetworkManager(_ manager: MeshNetworkManager,
                                          didSendMessage message: MeshMessage,
                                          from localElement: Element,
                                          to destination: MeshAddress) {
-        // Sent confirmation
+        logger.info("📤 SENT \(type(of: message)) to 0x\(String(destination.address, radix: 16))")
     }
 
     nonisolated func meshNetworkManager(_ manager: MeshNetworkManager,
@@ -653,7 +715,7 @@ extension MeshNetworkService: MeshNetworkDelegate {
                                          from localElement: Element,
                                          to destination: MeshAddress,
                                          error: Error) {
-        logger.error("Failed to send: \(error)")
+        logger.error("❌ FAILED to send \(type(of: message)) to 0x\(String(destination.address, radix: 16)): \(error)")
     }
 }
 
