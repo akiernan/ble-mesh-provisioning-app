@@ -316,11 +316,15 @@ final class MeshNetworkService: NSObject {
 
         let groupAddress: Address = 0xC001
         let group: Group
-        do {
-            group = try Group(name: name, address: MeshAddress(groupAddress))
-            try network.add(group: group)
-        } catch {
-            throw AppError.groupConfigFailed(error.localizedDescription)
+        if let existing = network.group(withAddress: MeshAddress(groupAddress)) {
+            group = existing
+        } else {
+            do {
+                group = try Group(name: name, address: MeshAddress(groupAddress))
+                try network.add(group: group)
+            } catch {
+                throw AppError.groupConfigFailed(error.localizedDescription)
+            }
         }
 
         // Subscribe each node's CTL + OnOff models to the group
