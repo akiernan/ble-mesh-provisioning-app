@@ -1,0 +1,470 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		AAAA00000000000000000011 /* NordicMesh in Frameworks */ = {isa = PBXBuildFile; productRef = AAAA00000000000000000010 /* NordicMesh */; };
+		AAAA00000000000000000101 /* MeshProvisionerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000100 /* MeshProvisionerApp.swift */; };
+		AAAA00000000000000000103 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000102 /* AppRouter.swift */; };
+		AAAA00000000000000000105 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000104 /* Models.swift */; };
+		AAAA00000000000000000107 /* MeshNetworkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000106 /* MeshNetworkService.swift */; };
+		AAAA00000000000000000109 /* DeviceDiscoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000108 /* DeviceDiscoveryView.swift */; };
+		AAAA0000000000000000010B /* DeviceDiscoveryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA0000000000000000010A /* DeviceDiscoveryViewModel.swift */; };
+		AAAA0000000000000000010D /* ProvisioningView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA0000000000000000010C /* ProvisioningView.swift */; };
+		AAAA0000000000000000010F /* ProvisioningViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA0000000000000000010E /* ProvisioningViewModel.swift */; };
+		AAAA00000000000000000111 /* KeyBindingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000110 /* KeyBindingView.swift */; };
+		AAAA00000000000000000113 /* KeyBindingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000112 /* KeyBindingViewModel.swift */; };
+		AAAA00000000000000000115 /* GroupConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000114 /* GroupConfigView.swift */; };
+		AAAA00000000000000000117 /* GroupConfigViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000116 /* GroupConfigViewModel.swift */; };
+		AAAA00000000000000000119 /* DeviceControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000118 /* DeviceControlView.swift */; };
+		AAAA0000000000000000011B /* DeviceControlViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA0000000000000000011A /* DeviceControlViewModel.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		AAAA0000000000000000000E /* MeshProvisioner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MeshProvisioner.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AAAA00000000000000000100 /* MeshProvisionerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshProvisionerApp.swift; sourceTree = "<group>"; };
+		AAAA00000000000000000102 /* AppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
+		AAAA00000000000000000104 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		AAAA00000000000000000106 /* MeshNetworkService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshNetworkService.swift; sourceTree = "<group>"; };
+		AAAA00000000000000000108 /* DeviceDiscoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceDiscoveryView.swift; sourceTree = "<group>"; };
+		AAAA0000000000000000010A /* DeviceDiscoveryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceDiscoveryViewModel.swift; sourceTree = "<group>"; };
+		AAAA0000000000000000010C /* ProvisioningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProvisioningView.swift; sourceTree = "<group>"; };
+		AAAA0000000000000000010E /* ProvisioningViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProvisioningViewModel.swift; sourceTree = "<group>"; };
+		AAAA00000000000000000110 /* KeyBindingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyBindingView.swift; sourceTree = "<group>"; };
+		AAAA00000000000000000112 /* KeyBindingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyBindingViewModel.swift; sourceTree = "<group>"; };
+		AAAA00000000000000000114 /* GroupConfigView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupConfigView.swift; sourceTree = "<group>"; };
+		AAAA00000000000000000116 /* GroupConfigViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupConfigViewModel.swift; sourceTree = "<group>"; };
+		AAAA00000000000000000118 /* DeviceControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceControlView.swift; sourceTree = "<group>"; };
+		AAAA0000000000000000011A /* DeviceControlViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceControlViewModel.swift; sourceTree = "<group>"; };
+		AAAA0000000000000000011C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		AAAA0000000000000000000A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AAAA00000000000000000011 /* NordicMesh in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		AAAA0000000000000000000C /* MeshProvisioner */ = {
+			isa = PBXGroup;
+			children = (
+				AAAA00000000000000000200 /* App */,
+				AAAA00000000000000000201 /* Core */,
+				AAAA00000000000000000202 /* Features */,
+				AAAA00000000000000000208 /* Resources */,
+				AAAA0000000000000000000D /* Products */,
+			);
+			path = MeshProvisioner;
+			sourceTree = "<group>";
+		};
+		AAAA0000000000000000000D /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AAAA0000000000000000000E /* MeshProvisioner.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AAAA00000000000000000200 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				AAAA00000000000000000100 /* MeshProvisionerApp.swift */,
+				AAAA00000000000000000102 /* AppRouter.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		AAAA00000000000000000201 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				AAAA00000000000000000104 /* Models.swift */,
+				AAAA00000000000000000106 /* MeshNetworkService.swift */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		AAAA00000000000000000202 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				AAAA00000000000000000203 /* Discovery */,
+				AAAA00000000000000000204 /* Provisioning */,
+				AAAA00000000000000000205 /* KeyBinding */,
+				AAAA00000000000000000206 /* GroupConfig */,
+				AAAA00000000000000000207 /* DeviceControl */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		AAAA00000000000000000203 /* Discovery */ = {
+			isa = PBXGroup;
+			children = (
+				AAAA00000000000000000108 /* DeviceDiscoveryView.swift */,
+				AAAA0000000000000000010A /* DeviceDiscoveryViewModel.swift */,
+			);
+			path = Discovery;
+			sourceTree = "<group>";
+		};
+		AAAA00000000000000000204 /* Provisioning */ = {
+			isa = PBXGroup;
+			children = (
+				AAAA0000000000000000010C /* ProvisioningView.swift */,
+				AAAA0000000000000000010E /* ProvisioningViewModel.swift */,
+			);
+			path = Provisioning;
+			sourceTree = "<group>";
+		};
+		AAAA00000000000000000205 /* KeyBinding */ = {
+			isa = PBXGroup;
+			children = (
+				AAAA00000000000000000110 /* KeyBindingView.swift */,
+				AAAA00000000000000000112 /* KeyBindingViewModel.swift */,
+			);
+			path = KeyBinding;
+			sourceTree = "<group>";
+		};
+		AAAA00000000000000000206 /* GroupConfig */ = {
+			isa = PBXGroup;
+			children = (
+				AAAA00000000000000000114 /* GroupConfigView.swift */,
+				AAAA00000000000000000116 /* GroupConfigViewModel.swift */,
+			);
+			path = GroupConfig;
+			sourceTree = "<group>";
+		};
+		AAAA00000000000000000207 /* DeviceControl */ = {
+			isa = PBXGroup;
+			children = (
+				AAAA00000000000000000118 /* DeviceControlView.swift */,
+				AAAA0000000000000000011A /* DeviceControlViewModel.swift */,
+			);
+			path = DeviceControl;
+			sourceTree = "<group>";
+		};
+		AAAA00000000000000000208 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				AAAA0000000000000000011C /* Info.plist */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		AAAA00000000000000000002 /* MeshProvisioner */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AAAA00000000000000000008 /* Build configuration list for PBXNativeTarget "MeshProvisioner" */;
+			buildPhases = (
+				AAAA00000000000000000009 /* Sources */,
+				AAAA0000000000000000000A /* Frameworks */,
+				AAAA0000000000000000000B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MeshProvisioner;
+			packageProductDependencies = (
+				AAAA00000000000000000010 /* NordicMesh */,
+			);
+			productName = MeshProvisioner;
+			productReference = AAAA0000000000000000000E /* MeshProvisioner.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		AAAA00000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1620;
+				LastUpgradeCheck = 2640;
+				TargetAttributes = {
+					AAAA00000000000000000002 = {
+						CreatedOnToolsVersion = 16.2;
+					};
+				};
+			};
+			buildConfigurationList = AAAA00000000000000000005 /* Build configuration list for PBXProject "MeshProvisioner" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = AAAA0000000000000000000C /* MeshProvisioner */;
+			packageReferences = (
+				AAAA0000000000000000000F /* XCRemoteSwiftPackageReference "IOS-nRF-Mesh-Library" */,
+			);
+			productRefGroup = AAAA0000000000000000000D /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				AAAA00000000000000000002 /* MeshProvisioner */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AAAA0000000000000000000B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		AAAA00000000000000000009 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AAAA00000000000000000101 /* MeshProvisionerApp.swift in Sources */,
+				AAAA00000000000000000103 /* AppRouter.swift in Sources */,
+				AAAA00000000000000000105 /* Models.swift in Sources */,
+				AAAA00000000000000000107 /* MeshNetworkService.swift in Sources */,
+				AAAA00000000000000000109 /* DeviceDiscoveryView.swift in Sources */,
+				AAAA0000000000000000010B /* DeviceDiscoveryViewModel.swift in Sources */,
+				AAAA0000000000000000010D /* ProvisioningView.swift in Sources */,
+				AAAA0000000000000000010F /* ProvisioningViewModel.swift in Sources */,
+				AAAA00000000000000000111 /* KeyBindingView.swift in Sources */,
+				AAAA00000000000000000113 /* KeyBindingViewModel.swift in Sources */,
+				AAAA00000000000000000115 /* GroupConfigView.swift in Sources */,
+				AAAA00000000000000000117 /* GroupConfigViewModel.swift in Sources */,
+				AAAA00000000000000000119 /* DeviceControlView.swift in Sources */,
+				AAAA0000000000000000011B /* DeviceControlViewModel.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		AAAA00000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = MT5MR22R48;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		AAAA00000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = MT5MR22R48;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		AAAA00000000000000000006 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MeshProvisioner/Resources/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = uk.a-squared-projects.MeshProvisioner;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = targeted;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		AAAA00000000000000000007 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MeshProvisioner/Resources/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = uk.a-squared-projects.MeshProvisioner;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		AAAA00000000000000000005 /* Build configuration list for PBXProject "MeshProvisioner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AAAA00000000000000000003 /* Debug */,
+				AAAA00000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AAAA00000000000000000008 /* Build configuration list for PBXNativeTarget "MeshProvisioner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AAAA00000000000000000006 /* Debug */,
+				AAAA00000000000000000007 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		AAAA0000000000000000000F /* XCRemoteSwiftPackageReference "IOS-nRF-Mesh-Library" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/NordicSemiconductor/IOS-nRF-Mesh-Library";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 4.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		AAAA00000000000000000010 /* NordicMesh */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AAAA0000000000000000000F /* XCRemoteSwiftPackageReference "IOS-nRF-Mesh-Library" */;
+			productName = NordicMesh;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = AAAA00000000000000000001 /* Project object */;
+}
