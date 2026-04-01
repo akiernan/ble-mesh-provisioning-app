@@ -519,9 +519,14 @@ final class MeshNetworkService: NSObject {
         let lightnessValue = UInt16(max(0.0, min(1.0, lightness)) * 65535)
         let clampedTemp = max(MeshGroupConfig.temperatureMin,
                               min(MeshGroupConfig.temperatureMax, temperature))
+        // Transition time matches the throttle interval so the device
+        // smoothly interpolates between successive slider updates.
+        let transition = TransitionTime(steps: 2, stepResolution: .hundredsOfMilliseconds) // 200ms
         let message = LightCTLSetUnacknowledged(lightness: lightnessValue,
                                                 temperature: clampedTemp,
-                                                deltaUV: 0)
+                                                deltaUV: 0,
+                                                transitionTime: transition,
+                                                delay: 0)
         try? await manager.send(message, to: dest, using: appKey)
     }
 
