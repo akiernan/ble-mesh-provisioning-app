@@ -10,9 +10,11 @@ struct DeviceControlView: View {
         Group {
             if let vm = viewModel {
                 content(vm: vm)
+            } else {
+                ProgressView()
             }
         }
-        .onAppear {
+        .task {
             if viewModel == nil {
                 viewModel = DeviceControlViewModel(meshService: meshService, router: router)
             }

@@ -9,9 +9,11 @@ struct KeyBindingView: View {
         Group {
             if let vm = viewModel {
                 content(vm: vm)
+            } else {
+                ProgressView()
             }
         }
-        .onAppear {
+        .task {
             if viewModel == nil {
                 let vm = KeyBindingViewModel(meshService: meshService, router: router)
                 viewModel = vm

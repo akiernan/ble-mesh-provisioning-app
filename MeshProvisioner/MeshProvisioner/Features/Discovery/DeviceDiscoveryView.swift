@@ -9,15 +9,17 @@ struct DeviceDiscoveryView: View {
         Group {
             if let vm = viewModel {
                 content(vm: vm)
+            } else {
+                ProgressView()
             }
         }
-        .onAppear {
+        .task {
             if viewModel == nil {
                 viewModel = DeviceDiscoveryViewModel(meshService: meshService, router: router)
             }
         }
         .navigationTitle("")
-        .navigationBarHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
     }
 
     @ViewBuilder
