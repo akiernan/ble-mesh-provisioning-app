@@ -55,12 +55,14 @@ enum ProvisioningDeviceState: Equatable {
 // MARK: - Key Binding
 
 enum KeyBindingStep: Int, CaseIterable {
+    case connectProxy
     case generateKey
     case distributeKeys
     case configureModels
 
     var title: String {
         switch self {
+        case .connectProxy: "Connect to Proxy"
         case .generateKey: "Generate Application Key"
         case .distributeKeys: "Distribute Keys"
         case .configureModels: "Configure Models"
@@ -69,6 +71,7 @@ enum KeyBindingStep: Int, CaseIterable {
 
     var description: String {
         switch self {
+        case .connectProxy: "Establishing GATT proxy connection"
         case .generateKey: "Creating secure 128-bit AES encryption keys"
         case .distributeKeys: "Binding keys to devices"
         case .configureModels: "Setting up Light CTL model"

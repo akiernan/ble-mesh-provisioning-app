@@ -57,7 +57,7 @@ final class MeshNetworkService: NSObject {
 
     // Proxy connection
     private var proxyBearer: GattBearer?
-    private var proxyContinuation: CheckedContinuation<Void, Never>?
+    private var proxyConnectionContinuation: CheckedContinuation<Void, Error>?
 
     // MARK: Init
 
@@ -219,10 +219,41 @@ final class MeshNetworkService: NSObject {
         }
     }
 
+    // MARK: - Message Sending
+
+    /// Runs an async operation with a timeout. If the timeout fires first, execution
+    /// continues immediately — the operation is left running in the background but
+    /// does not block progress. This is critical because `manager.send()` can hang
+    /// forever when proxy notifications aren't working and the response is never received.
+    private func withTimeout(
+        _ timeout: Duration = .seconds(8),
+        operation: @escaping @Sendable () async throws -> Void
+    ) async {
+        let gate = OnceGate()
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            Task {
+                try? await operation()
+                if gate.tryPass() { continuation.resume() }
+            }
+            Task {
+                try? await Task.sleep(for: timeout)
+                if gate.tryPass() {
+                    logger.warning("Config message timed out — continuing")
+                    continuation.resume()
+                }
+            }
+        }
+    }
+
     // MARK: - Key Binding
 
     func performKeyBinding(nodes: [Node]) async throws {
         guard let network = manager.meshNetwork else { throw AppError.networkNotReady }
+
+        // Step 0: Connect to GATT proxy
+        keyBindingStepStates[.connectProxy] = .inProgress
+        try await connectToProxy()
+        keyBindingStepStates[.connectProxy] = .completed
 
         // Step 1: Generate / retrieve application key
         keyBindingStepStates[.generateKey] = .inProgress
@@ -244,7 +275,7 @@ final class MeshNetworkService: NSObject {
         keyBindingStepStates[.distributeKeys] = .inProgress
         for node in nodes {
             let request = ConfigAppKeyAdd(applicationKey: appKey)
-            _ = try? await manager.send(request, to: node)
+            await withTimeout { [manager] in _ = try await manager.send(request, to: node) }
             try? await Task.sleep(for: .milliseconds(200))
         }
         keyBindingStepStates[.distributeKeys] = .completed
@@ -255,14 +286,14 @@ final class MeshNetworkService: NSObject {
             for element in node.elements {
                 if let model = element.model(withSigModelId: SIGModelID.lightCTLServer) {
                     if let bindMsg = ConfigModelAppBind(applicationKey: appKey, to: model) {
-                        _ = try? await manager.send(bindMsg, to: node)
+                        await withTimeout { [manager] in _ = try await manager.send(bindMsg, to: node) }
                         try? await Task.sleep(for: .milliseconds(200))
                     }
                 }
                 // Also bind GenericOnOff for on/off control
                 if let model = element.model(withSigModelId: SIGModelID.genericOnOffServer) {
                     if let bindMsg = ConfigModelAppBind(applicationKey: appKey, to: model) {
-                        _ = try? await manager.send(bindMsg, to: node)
+                        await withTimeout { [manager] in _ = try await manager.send(bindMsg, to: node) }
                         try? await Task.sleep(for: .milliseconds(200))
                     }
                 }
@@ -277,6 +308,11 @@ final class MeshNetworkService: NSObject {
 
     func configureGroup(name: String, nodes: [Node]) async throws -> MeshGroupConfig {
         guard let network = manager.meshNetwork else { throw AppError.networkNotReady }
+
+        // Ensure proxy connection is active
+        if !isConnectedToProxy {
+            try await connectToProxy()
+        }
 
         let groupAddress: Address = 0xC001
         let group: Group
@@ -294,7 +330,7 @@ final class MeshNetworkService: NSObject {
                 for modelID in modelIDs {
                     if let model = element.model(withSigModelId: modelID),
                        let msg = ConfigModelSubscriptionAdd(group: group, to: model) {
-                        _ = try? await manager.send(msg, to: node)
+                        await withTimeout { [manager] in _ = try await manager.send(msg, to: node) }
                         try? await Task.sleep(for: .milliseconds(200))
                     }
                 }
@@ -318,31 +354,44 @@ final class MeshNetworkService: NSObject {
 
     // MARK: - Proxy Connection
 
-    func connectToProxy() async {
-        guard bluetoothState == .poweredOn else { return }
-        guard let network = manager.meshNetwork else { return }
+    /// Scans for a GATT proxy node, connects, and waits until the bearer is open.
+    func connectToProxy() async throws {
+        guard bluetoothState == .poweredOn else {
+            throw AppError.bluetoothUnavailable
+        }
+        guard manager.meshNetwork != nil else {
+            throw AppError.networkNotReady
+        }
+
+        // Already connected – nothing to do
+        if isConnectedToProxy { return }
+
+        // Give the device time to transition from provisioning to proxy mode
+        // and for the old PB-GATT bearer to fully close before we connect.
+        try await Task.sleep(for: .seconds(2))
 
         // Scan for proxy nodes
         scannerCentralManager.scanForPeripherals(
             withServices: [MeshProxyService.uuid],
             options: [CBCentralManagerScanOptionAllowDuplicatesKey: false]
         )
+        logger.info("Scanning for proxy nodes...")
 
-        // Wait up to 10 seconds for a proxy
-        await withCheckedContinuation { continuation in
-            proxyContinuation = continuation
+        // Wait until the proxy bearer is fully open (not just discovered)
+        try await withCheckedThrowingContinuation { continuation in
+            proxyConnectionContinuation = continuation
             Task {
-                try? await Task.sleep(for: .seconds(10))
+                try? await Task.sleep(for: .seconds(15))
                 await MainActor.run {
-                    if let cont = self.proxyContinuation {
-                        self.proxyContinuation = nil
+                    if let cont = self.proxyConnectionContinuation {
+                        self.proxyConnectionContinuation = nil
                         self.scannerCentralManager.stopScan()
-                        cont.resume()
+                        cont.resume(throwing: AppError.messageSendFailed(
+                            "Proxy connection timed out"))
                     }
                 }
             }
         }
-        _ = network
     }
 
     // MARK: - Light CTL Control
@@ -402,12 +451,10 @@ extension MeshNetworkService: CBCentralManagerDelegate {
         let rssiValue = RSSI.intValue
 
         Task { @MainActor in
-            // Proxy discovery
-            if let cont = proxyContinuation, hasServiceData {
-                proxyContinuation = nil
+            // Proxy discovery – connect but don't resume until bearer is open
+            if proxyConnectionContinuation != nil, hasServiceData {
                 central.stopScan()
                 connectToProxyPeripheral(peripheral)
-                cont.resume()
                 return
             }
 
@@ -459,6 +506,10 @@ extension MeshNetworkService: BearerDelegate {
             if bearer === proxyBearer {
                 isConnectedToProxy = true
                 logger.info("Connected to proxy")
+                if let cont = proxyConnectionContinuation {
+                    proxyConnectionContinuation = nil
+                    cont.resume()
+                }
             }
         }
     }
@@ -470,6 +521,12 @@ extension MeshNetworkService: BearerDelegate {
                 proxyBearer = nil
                 manager.transmitter = nil
                 logger.info("Proxy disconnected")
+                // If we were still waiting on connection, report the failure
+                if let cont = proxyConnectionContinuation {
+                    proxyConnectionContinuation = nil
+                    cont.resume(throwing: error ?? AppError.messageSendFailed(
+                        "Proxy connection closed"))
+                }
             }
         }
     }
@@ -603,3 +660,20 @@ private final class ProvisioningBearerBridge: NSObject, BearerDelegate {
     func bearerDidOpen(_ bearer: Bearer) { onOpen() }
     func bearer(_ bearer: Bearer, didClose error: Error?) { onClose(error) }
 }
+// MARK: - OnceGate
+
+/// Thread-safe gate that allows only the first caller through.
+/// Used to ensure a continuation is resumed exactly once in a race between
+/// an operation completing and a timeout firing.
+private final class OnceGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var passed = false
+    func tryPass() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !passed else { return false }
+        passed = true
+        return true
+    }
+}
+

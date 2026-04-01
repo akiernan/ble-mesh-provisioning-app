@@ -188,6 +188,7 @@ private struct KeyBindingStepRow: View {
         case .failed: "xmark"
         case .pending:
             switch step {
+            case .connectProxy: "antenna.radiowaves.left.and.right"
             case .generateKey: "key"
             case .distributeKeys: "lock"
             case .configureModels: "slider.horizontal.3"

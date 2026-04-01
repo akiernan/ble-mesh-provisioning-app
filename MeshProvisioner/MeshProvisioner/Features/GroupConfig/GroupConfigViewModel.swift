@@ -39,8 +39,8 @@ final class GroupConfigViewModel {
             _ = try await meshService.configureGroup(name: roomName, nodes: nodes)
             try? await Task.sleep(for: .milliseconds(400))
 
-            // Attempt proxy connection
-            await meshService.connectToProxy()
+            // Ensure proxy is still connected for device control
+            try? await meshService.connectToProxy()
 
             router.navigate(to: .deviceControl)
         } catch {
