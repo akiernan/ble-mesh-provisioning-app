@@ -509,8 +509,6 @@ final class MeshNetworkService: NSObject {
                                                 temperature: clampedTemp,
                                                 deltaUV: 0)
         try? await manager.send(message, to: dest, using: appKey)
-        currentGroup?.lightness = lightness
-        currentGroup?.temperature = temperature
     }
 }
 
