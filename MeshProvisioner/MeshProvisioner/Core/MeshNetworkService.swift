@@ -48,6 +48,8 @@ final class MeshNetworkService: NSObject {
     // Provisioning helpers – each device gets its own PBGattBearer (own central manager)
     private var activeProvisioningManagers: [UUID: ProvisioningManager] = [:]
     private var provisioningContinuations: [UUID: CheckedContinuation<Node, Error>] = [:]
+    // Strong reference to bearer delegates – PBGattBearer.delegate is weak
+    private var activeBearerDelegates: [UUID: ProvisioningBearerBridge] = [:]
 
     // Peripheral UUID → device UUID mapping (for scanning results)
     private var peripheralIDToDeviceID: [UUID: UUID] = [:]
@@ -158,7 +160,7 @@ final class MeshNetworkService: NSObject {
                 provisioningContinuations[device.id] = continuation
                 peripheralIDToDeviceID[peripheral.identifier] = device.id
 
-                bearer.delegate = ProvisioningBearerBridge(
+                let bridge = ProvisioningBearerBridge(
                     deviceID: device.id,
                     provisioningManager: pm,
                     onOpen: { [weak self] in
@@ -175,6 +177,9 @@ final class MeshNetworkService: NSObject {
                         }
                     }
                 )
+                // Keep a strong reference — bearer.delegate is weak
+                activeBearerDelegates[device.id] = bridge
+                bearer.delegate = bridge
                 try bearer.open()
             } catch {
                 provisioningContinuations.removeValue(forKey: device.id)
@@ -202,6 +207,7 @@ final class MeshNetworkService: NSObject {
     @MainActor
     private func finishProvisioning(id: UUID, result: Result<Node, Error>) {
         activeProvisioningManagers.removeValue(forKey: id)
+        activeBearerDelegates.removeValue(forKey: id)
         guard let cont = provisioningContinuations.removeValue(forKey: id) else { return }
         switch result {
         case .success(let node):
