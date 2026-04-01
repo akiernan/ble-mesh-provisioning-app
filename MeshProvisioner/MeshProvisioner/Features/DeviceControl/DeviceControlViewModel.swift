@@ -16,34 +16,47 @@ final class DeviceControlViewModel {
 
     var group: MeshGroupConfig? { meshService.currentGroup }
     var isConnected: Bool { meshService.isConnectedToProxy }
-    var deviceCount: Int { meshService.selectedDevicesForProvisioning.count }
-    var deviceNames: [String] { meshService.selectedDevicesForProvisioning.map(\.name) }
+    var deviceCount: Int { meshService.provisionedNodes.count }
+    var deviceNames: [String] {
+        meshService.provisionedNodes.map { $0.name ?? "Mesh Node" }
+    }
+
+    func connectIfNeeded() {
+        guard !meshService.isConnectedToProxy else { return }
+        Task { try? await meshService.connectToProxy() }
+    }
 
     func togglePower() {
         guard let group else { return }
-        do {
-            try meshService.setOnOff(!group.isOn)
-        } catch {
-            errorMessage = error.localizedDescription
+        Task {
+            do {
+                try await meshService.setOnOff(!group.isOn)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
     func setLightness(_ lightness: Double) {
         guard let group else { return }
-        do {
-            try meshService.setLightCTL(lightness: lightness, temperature: group.temperature)
-        } catch {
-            errorMessage = error.localizedDescription
+        Task {
+            do {
+                try await meshService.setLightCTL(lightness: lightness, temperature: group.temperature)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
     func setTemperature(_ temperature: Double) {
         guard let group else { return }
         let kelvin = UInt16(temperature)
-        do {
-            try meshService.setLightCTL(lightness: group.lightness, temperature: kelvin)
-        } catch {
-            errorMessage = error.localizedDescription
+        Task {
+            do {
+                try await meshService.setLightCTL(lightness: group.lightness, temperature: kelvin)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 

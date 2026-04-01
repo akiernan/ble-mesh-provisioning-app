@@ -24,6 +24,11 @@ struct MeshProvisionerApp: App {
             }
             .environment(meshService)
             .environment(router)
+            .onAppear {
+                if meshService.hasProvisionedNetwork {
+                    router.navigate(to: .deviceControl)
+                }
+            }
         }
     }
 }

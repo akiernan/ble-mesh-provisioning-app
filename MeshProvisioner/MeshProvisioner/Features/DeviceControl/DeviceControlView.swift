@@ -16,7 +16,9 @@ struct DeviceControlView: View {
         }
         .task {
             if viewModel == nil {
-                viewModel = DeviceControlViewModel(meshService: meshService, router: router)
+                let vm = DeviceControlViewModel(meshService: meshService, router: router)
+                viewModel = vm
+                vm.connectIfNeeded()
             }
         }
         .navigationBarBackButtonHidden(true)

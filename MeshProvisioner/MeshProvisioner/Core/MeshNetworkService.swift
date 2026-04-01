@@ -93,10 +93,44 @@ final class MeshNetworkService: NSObject {
                 try appKey.bind(to: netKey)
             }
             _ = manager.save()
+            restoreStateFromNetwork()
         } catch {
             self.error = error
             logger.error("Failed to set up mesh network: \(error)")
         }
+    }
+
+    /// Restores transient state from the persisted mesh network so the app
+    /// can skip straight to the control screen on relaunch.
+    private func restoreStateFromNetwork() {
+        guard let network = manager.meshNetwork else { return }
+
+        // Restore provisioned nodes (all nodes except the local provisioner)
+        let localProvisioner = network.localProvisioner
+        let remoteNodes = network.nodes.filter { $0.uuid != localProvisioner?.node?.uuid }
+        guard !remoteNodes.isEmpty else { return }
+        provisionedNodes = remoteNodes
+
+        // Restore group config from persisted group at 0xC001
+        let groupAddress: Address = 0xC001
+        guard let group = network.group(withAddress: MeshAddress(groupAddress)) else { return }
+
+        currentGroup = MeshGroupConfig(
+            id: UUID().uuidString,
+            name: group.name,
+            groupAddress: groupAddress,
+            nodeUnicastAddresses: remoteNodes.map { $0.primaryUnicastAddress },
+            isOn: false,
+            lightness: 0.5,
+            temperature: 4000
+        )
+        logger.info("Restored network: \(remoteNodes.count) node(s), group '\(group.name)'")
+    }
+
+    /// Whether the persisted network has provisioned nodes and a configured group,
+    /// meaning the app can skip directly to the device control screen.
+    var hasProvisionedNetwork: Bool {
+        currentGroup != nil && !provisionedNodes.isEmpty
     }
 
     // MARK: - Scanning
@@ -252,6 +286,8 @@ final class MeshNetworkService: NSObject {
 
         // Step 0: Connect to GATT proxy
         keyBindingStepStates[.connectProxy] = .inProgress
+        // Allow the device to transition from PB-GATT provisioning to proxy mode
+        try await Task.sleep(for: .seconds(2))
         try await connectToProxy()
         keyBindingStepStates[.connectProxy] = .completed
 
@@ -370,10 +406,6 @@ final class MeshNetworkService: NSObject {
         // Already connected – nothing to do
         if isConnectedToProxy { return }
 
-        // Give the device time to transition from provisioning to proxy mode
-        // and for the old PB-GATT bearer to fully close before we connect.
-        try await Task.sleep(for: .seconds(2))
-
         // Scan for proxy nodes
         scannerCentralManager.scanForPeripherals(
             withServices: [MeshProxyService.uuid],
@@ -400,24 +432,24 @@ final class MeshNetworkService: NSObject {
 
     // MARK: - Light CTL Control
 
-    func setOnOff(_ on: Bool) throws {
+    func setOnOff(_ on: Bool) async throws {
         guard let group = currentGroup,
               let appKey = manager.meshNetwork?.applicationKeys.first else {
             throw AppError.messageSendFailed("No group or app key configured")
         }
+        try await connectToProxy()
         let dest = MeshAddress(group.groupAddress)
         let message = GenericOnOffSetUnacknowledged(on)
-        Task {
-            try? await manager.send(message, to: dest, using: appKey)
-        }
+        try? await manager.send(message, to: dest, using: appKey)
         currentGroup?.isOn = on
     }
 
-    func setLightCTL(lightness: Double, temperature: UInt16) throws {
+    func setLightCTL(lightness: Double, temperature: UInt16) async throws {
         guard let group = currentGroup,
               let appKey = manager.meshNetwork?.applicationKeys.first else {
             throw AppError.messageSendFailed("No group or app key configured")
         }
+        try await connectToProxy()
         let dest = MeshAddress(group.groupAddress)
         let lightnessValue = UInt16(max(0.0, min(1.0, lightness)) * 65535)
         let clampedTemp = max(MeshGroupConfig.temperatureMin,
@@ -425,9 +457,7 @@ final class MeshNetworkService: NSObject {
         let message = LightCTLSetUnacknowledged(lightness: lightnessValue,
                                                 temperature: clampedTemp,
                                                 deltaUV: 0)
-        Task {
-            try? await manager.send(message, to: dest, using: appKey)
-        }
+        try? await manager.send(message, to: dest, using: appKey)
         currentGroup?.lightness = lightness
         currentGroup?.temperature = temperature
     }
@@ -530,6 +560,13 @@ extension MeshNetworkService: BearerDelegate {
                     proxyConnectionContinuation = nil
                     cont.resume(throwing: error ?? AppError.messageSendFailed(
                         "Proxy connection closed"))
+                } else if hasProvisionedNetwork {
+                    // Auto-reconnect if we have a provisioned network
+                    logger.info("Auto-reconnecting to proxy...")
+                    Task {
+                        try? await Task.sleep(for: .seconds(1))
+                        try? await connectToProxy()
+                    }
                 }
             }
         }
