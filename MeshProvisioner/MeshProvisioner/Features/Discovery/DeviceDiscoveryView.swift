@@ -61,11 +61,11 @@ struct DeviceDiscoveryView: View {
                 .padding(.horizontal, 24)
                 .padding(.bottom, 120)
             }
-
-            // Footer continue button
-            if !vm.discoveredDevices.isEmpty && !vm.isScanning {
-                footer(vm: vm)
+            .onChange(of: vm.discoveredDevices.count) {
+                vm.autoSelectNewDevices()
             }
+
+            footer(vm: vm)
         }
     }
 
@@ -98,20 +98,12 @@ struct DeviceDiscoveryView: View {
     private func deviceList(vm: DeviceDiscoveryViewModel) -> some View {
         VStack(spacing: 16) {
             HStack {
-                Text(vm.isScanning
-                     ? "Scanning..."
-                     : "Found \(vm.discoveredDevices.count) device\(vm.discoveredDevices.count == 1 ? "" : "s")")
+                Text("Found \(vm.discoveredDevices.count) device\(vm.discoveredDevices.count == 1 ? "" : "s")")
                     .font(.headline)
                     .foregroundStyle(.secondary)
                 Spacer()
-                if !vm.isScanning {
-                    Button("Rescan") { vm.startScanning() }
-                        .font(.subheadline)
-                        .tint(.blue)
-                } else {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                }
+                ProgressView()
+                    .scaleEffect(0.8)
             }
 
             ForEach(vm.discoveredDevices) { device in

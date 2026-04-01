@@ -24,11 +24,19 @@ final class DeviceDiscoveryViewModel {
     }
 
     func startScanning() {
+        selectedIDs = []
         meshService.startScanning()
     }
 
     func stopScanning() {
         meshService.stopScanning()
+    }
+
+    /// Auto-select newly discovered devices.
+    func autoSelectNewDevices() {
+        for device in discoveredDevices where !selectedIDs.contains(device.id) {
+            selectedIDs.insert(device.id)
+        }
     }
 
     func toggle(_ device: DiscoveredDevice) {
