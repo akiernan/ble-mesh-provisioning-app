@@ -692,6 +692,8 @@ extension MeshNetworkService: MeshNetworkDelegate {
                                          didReceiveMessage message: MeshMessage,
                                          sentFrom source: Address,
                                          to destination: MeshAddress) {
+        // Ignore loopback — messages we sent to a group that echo back via the proxy filter
+        guard source != manager.meshNetwork?.localProvisioner?.primaryUnicastAddress else { return }
         logger.info("📩 RECEIVED \(type(of: message)) from 0x\(String(source, radix: 16)) to 0x\(String(destination.address, radix: 16))")
         if message is ConfigCompositionDataStatus {
             logger.info("📩 Got composition data response!")
