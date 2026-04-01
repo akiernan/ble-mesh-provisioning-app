@@ -72,7 +72,7 @@ struct DeviceDiscoveryView: View {
     private var bluetoothUnavailableView: some View {
         ContentUnavailableView(
             "Bluetooth Unavailable",
-            systemImage: "bluetooth.slash",
+            systemImage: "xmark.circle",
             description: Text("Please enable Bluetooth to scan for mesh devices.")
         )
     }
