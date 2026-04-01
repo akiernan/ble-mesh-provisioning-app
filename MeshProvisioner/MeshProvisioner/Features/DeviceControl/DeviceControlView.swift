@@ -65,44 +65,44 @@ struct DeviceControlView: View {
     // MARK: - Header
 
     private func header(vm: DeviceControlViewModel) -> some View {
-        ZStack {
+        HStack(spacing: 16) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.white.opacity(0.12))
+                    .frame(width: 48, height: 48)
+                Image(systemName: "lightbulb.fill")
+                    .font(.title3)
+                    .foregroundStyle(.white)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(vm.group?.name ?? "Lights")
+                    .font(.title2.bold())
+                    .foregroundStyle(.white)
+                Text("\(vm.deviceCount) device\(vm.deviceCount == 1 ? "" : "s")")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.white.opacity(0.7))
+            }
+            Spacer()
+            Button {
+                vm.restart()
+            } label: {
+                Image(systemName: "arrow.counterclockwise")
+                    .font(.body)
+                    .foregroundStyle(.white)
+                    .padding(10)
+                    .background(Color.white.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 20)
+        .background(
             LinearGradient(
                 colors: [Color(white: 0.15), Color(white: 0.08)],
                 startPoint: .leading,
                 endPoint: .trailing
             )
-            HStack(spacing: 16) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.white.opacity(0.12))
-                        .frame(width: 48, height: 48)
-                    Image(systemName: "lightbulb.fill")
-                        .font(.title3)
-                        .foregroundStyle(.white)
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(vm.group?.name ?? "Lights")
-                        .font(.title2.bold())
-                        .foregroundStyle(.white)
-                    Text("\(vm.deviceCount) device\(vm.deviceCount == 1 ? "" : "s")")
-                        .font(.subheadline)
-                        .foregroundStyle(Color.white.opacity(0.7))
-                }
-                Spacer()
-                Button {
-                    vm.restart()
-                } label: {
-                    Image(systemName: "arrow.counterclockwise")
-                        .font(.body)
-                        .foregroundStyle(.white)
-                        .padding(10)
-                        .background(Color.white.opacity(0.12))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                }
-            }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 20)
-        }
+        )
     }
 
     // MARK: - Power
