@@ -105,6 +105,9 @@ struct MeshGroupConfig: Identifiable, Hashable {
     static let temperatureMin: UInt16 = 2000
     static let temperatureMax: UInt16 = 8000
 
+    var temperatureRangeMin: UInt16 = MeshGroupConfig.temperatureMin
+    var temperatureRangeMax: UInt16 = MeshGroupConfig.temperatureMax
+
     var lightnessUInt16: UInt16 { UInt16(lightness * 65535) }
 
     func temperatureLabel() -> String {

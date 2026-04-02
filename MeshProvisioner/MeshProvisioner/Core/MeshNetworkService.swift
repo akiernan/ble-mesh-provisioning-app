@@ -517,8 +517,9 @@ final class MeshNetworkService: NSObject {
         try await connectToProxy()
         let dest = MeshAddress(group.groupAddress)
         let lightnessValue = UInt16(max(0.0, min(1.0, lightness)) * 65535)
-        let clampedTemp = max(MeshGroupConfig.temperatureMin,
-                              min(MeshGroupConfig.temperatureMax, temperature))
+        let rangeMin = currentGroup?.temperatureRangeMin ?? MeshGroupConfig.temperatureMin
+        let rangeMax = currentGroup?.temperatureRangeMax ?? MeshGroupConfig.temperatureMax
+        let clampedTemp = max(rangeMin, min(rangeMax, temperature))
         // Transition time matches the throttle interval so the device
         // smoothly interpolates between successive slider updates.
         let transition = TransitionTime(steps: 2, stepResolution: .hundredsOfMilliseconds) // 200ms
@@ -590,6 +591,25 @@ final class MeshNetworkService: NSObject {
                 }
             } catch {
                 logger.warning("🔄 Failed to query CTL state: \(error)")
+            }
+        }
+
+        // Query LightCTL temperature range (sent to CTL Server, same as LightCTLGet)
+        if let ctlServerForRange = node.elements.lazy
+            .compactMap({ $0.model(withSigModelId: .lightCTLServerModelId) }).first {
+            do {
+                let response = try await manager.send(LightCTLTemperatureRangeGet(), to: ctlServerForRange)
+                if let status = response as? LightCTLTemperatureRangeStatus {
+                    logger.info("🔄 CTL temperature range: \(status.min)K–\(status.max)K")
+                    currentGroup?.temperatureRangeMin = status.min
+                    currentGroup?.temperatureRangeMax = status.max
+                    // Clamp current temperature to new range
+                    if let temp = currentGroup?.temperature {
+                        currentGroup?.temperature = max(status.min, min(status.max, temp))
+                    }
+                }
+            } catch {
+                logger.warning("🔄 Failed to query CTL temperature range: \(error)")
             }
         }
     }
@@ -796,6 +816,14 @@ extension MeshNetworkService: MeshNetworkDelegate {
                 self.currentGroup?.lightness = lightness
                 self.currentGroup?.temperature = status.temperature
             }
+            if let status = message as? LightCTLTemperatureRangeStatus {
+                logger.info("🔄 CTL temperature range: \(status.min)K–\(status.max)K")
+                self.currentGroup?.temperatureRangeMin = status.min
+                self.currentGroup?.temperatureRangeMax = status.max
+                if let temp = self.currentGroup?.temperature {
+                    self.currentGroup?.temperature = max(status.min, min(status.max, temp))
+                }
+            }
         }
     }
 
@@ -890,6 +918,7 @@ private class LightControlClientDelegate: ModelDelegate {
         self.messageTypes = [
             GenericOnOffStatus.opCode: GenericOnOffStatus.self,
             LightCTLStatus.opCode: LightCTLStatus.self,
+            LightCTLTemperatureRangeStatus.opCode: LightCTLTemperatureRangeStatus.self,
         ]
     }
 

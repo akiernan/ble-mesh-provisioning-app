@@ -180,11 +180,11 @@ struct DeviceControlView: View {
                 }
                 temperatureSlider(vm: vm, group: group)
                 HStack {
-                    Text("2000K\nWarm").font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.leading)
+                    Text("\(group.temperatureRangeMin)K\nWarm").font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.leading)
                     Spacer()
-                    Text("5000K").font(.caption).foregroundStyle(.secondary)
+                    Text("\((group.temperatureRangeMin + group.temperatureRangeMax) / 2)K").font(.caption).foregroundStyle(.secondary)
                     Spacer()
-                    Text("8000K\nCool").font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.trailing)
+                    Text("\(group.temperatureRangeMax)K\nCool").font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.trailing)
                 }
             }
         }
@@ -194,8 +194,8 @@ struct DeviceControlView: View {
     }
 
     private func temperatureSlider(vm: DeviceControlViewModel, group: MeshGroupConfig) -> some View {
-        let minTemp = Double(MeshGroupConfig.temperatureMin)
-        let maxTemp = Double(MeshGroupConfig.temperatureMax)
+        let minTemp = Double(group.temperatureRangeMin)
+        let maxTemp = Double(group.temperatureRangeMax)
         return ZStack {
             // Gradient track
             RoundedRectangle(cornerRadius: 4)
