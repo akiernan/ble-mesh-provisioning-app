@@ -5,6 +5,7 @@ struct DeviceControlView: View {
     @Environment(AppRouter.self) private var router
     @State private var viewModel: DeviceControlViewModel?
     @State private var showDevices = false
+    @State private var showResetConfirm = false
 
     var body: some View {
         Group {
@@ -23,6 +24,14 @@ struct DeviceControlView: View {
         }
         .navigationBarBackButtonHidden(true)
         .navigationTitle("")
+        .alert("Reset Mesh Network?", isPresented: $showResetConfirm) {
+            Button("Reset", role: .destructive) {
+                viewModel?.restart()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will delete all provisioned devices and start over. The devices will need to be re-provisioned.")
+        }
     }
 
     private func content(vm: DeviceControlViewModel) -> some View {
@@ -84,7 +93,7 @@ struct DeviceControlView: View {
             }
             Spacer()
             Button {
-                vm.restart()
+                showResetConfirm = true
             } label: {
                 Image(systemName: "arrow.counterclockwise")
                     .font(.body)

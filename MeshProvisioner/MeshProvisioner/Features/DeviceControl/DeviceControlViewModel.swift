@@ -74,14 +74,7 @@ final class DeviceControlViewModel {
 
     func restart() {
         throttleTask?.cancel()
-        meshService.selectedDevicesForProvisioning = []
-        meshService.provisionedNodes = []
-        meshService.discoveredDevices = []
-        meshService.currentGroup = nil
-        meshService.provisioningStates = [:]
-        meshService.keyBindingStepStates = Dictionary(
-            uniqueKeysWithValues: KeyBindingStep.allCases.map { ($0, .pending) }
-        )
+        meshService.resetMeshNetwork()
         router.popToRoot()
     }
 

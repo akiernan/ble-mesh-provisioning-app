@@ -157,6 +157,45 @@ final class MeshNetworkService: NSObject {
         currentGroup != nil && !provisionedNodes.isEmpty
     }
 
+    /// Wipes the persisted mesh network and resets all state so the user can
+    /// start the provisioning flow from scratch.
+    func resetMeshNetwork() {
+        // Disconnect proxy
+        proxyBearer?.close()
+        proxyBearer = nil
+        manager.transmitter = nil
+        isConnectedToProxy = false
+        proxyConnectionContinuation?.resume(throwing: AppError.networkNotReady)
+        proxyConnectionContinuation = nil
+
+        // Stop scanning
+        scannerCentralManager.stopScan()
+        isScanning = false
+
+        // Delete persisted MeshNetwork.json
+        if let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+            .first?.appendingPathComponent("MeshNetwork.json") {
+            try? FileManager.default.removeItem(at: url)
+        }
+
+        // Reset observable state
+        discoveredDevices = []
+        selectedDevicesForProvisioning = []
+        provisionedNodes = []
+        currentGroup = nil
+        provisioningStates = [:]
+        keyBindingStepStates = Dictionary(uniqueKeysWithValues: KeyBindingStep.allCases.map { ($0, .pending) })
+        groupConfigProgress = 0
+        groupConfigStatus = ""
+        error = nil
+        peripheralIDToDeviceID = [:]
+        discoveredPeripheralMeshData = [:]
+
+        // Create a fresh network
+        setupMeshNetwork()
+        logger.info("Mesh network reset to factory defaults")
+    }
+
     // MARK: - Scanning
 
     func startScanning() {
