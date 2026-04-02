@@ -21,6 +21,7 @@ final class GroupConfigViewModel {
     var devices: [DiscoveredDevice] { meshService.selectedDevicesForProvisioning }
     var configProgress: Double { meshService.groupConfigProgress }
     var configStatus: String { meshService.groupConfigStatus }
+    var nodeGroupConfigStates: [NodeKeyBindingState] { meshService.nodeGroupConfigStates }
 
     func createGroup() {
         guard !isConfiguring, !roomName.trimmingCharacters(in: .whitespaces).isEmpty else { return }

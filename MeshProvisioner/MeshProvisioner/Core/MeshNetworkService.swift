@@ -44,6 +44,10 @@ final class MeshNetworkService: NSObject {
 
     var nodeKeyBindingStates: [NodeKeyBindingState] = []
 
+    // MARK: Per-Node Group Config Progress
+
+    var nodeGroupConfigStates: [NodeKeyBindingState] = []
+
     // MARK: Node Reset Progress
 
     var isResettingNodes = false
@@ -226,6 +230,7 @@ final class MeshNetworkService: NSObject {
         groupConfigProgress = 0
         groupConfigStatus = ""
         nodeKeyBindingStates = []
+        nodeGroupConfigStates = []
         error = nil
         peripheralIDToDeviceID = [:]
         discoveredPeripheralMeshData = [:]
@@ -580,11 +585,17 @@ final class MeshNetworkService: NSObject {
 
         groupConfigProgress = 0
         groupConfigStatus = "Starting…"
+        nodeGroupConfigStates = nodes.enumerated().map { idx, node in
+            NodeKeyBindingState(id: node.uuid, name: node.name ?? "Device \(idx + 1)", state: .pending)
+        }
 
         // Subscribe each node's non-config models to the group, and configure
         // publishing for status-reporting models.
         for (nodeIndex, node) in nodes.enumerated() {
             let nodeName = node.name ?? "Device \(nodeIndex + 1)"
+            if let idx = nodeGroupConfigStates.firstIndex(where: { $0.id == node.uuid }) {
+                nodeGroupConfigStates[idx].state = .inProgress
+            }
             for element in node.elements {
                 for model in element.models {
                     let modelId = model.modelId
@@ -612,6 +623,9 @@ final class MeshNetworkService: NSObject {
                         groupConfigProgress = Double(completedOps) / Double(totalOps)
                     }
                 }
+            }
+            if let idx = nodeGroupConfigStates.firstIndex(where: { $0.id == node.uuid }) {
+                nodeGroupConfigStates[idx].state = .completed
             }
         }
 

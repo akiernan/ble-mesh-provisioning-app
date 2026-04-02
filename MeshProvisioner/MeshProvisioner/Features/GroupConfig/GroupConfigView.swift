@@ -175,22 +175,16 @@ struct GroupConfigView: View {
 
     private func configuringView(vm: GroupConfigViewModel) -> some View {
         VStack(spacing: 24) {
-            ProgressView()
-                .scaleEffect(1.5)
-                .tint(.teal)
-            Text("Configuring group bindings...")
-                .font(.headline)
-            Text("Setting up \"\(vm.roomName)\"")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
+            // Overall progress bar
             VStack(spacing: 8) {
                 HStack {
                     Text("Setup Progress")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Text("\(Int(vm.configProgress * 100))%")
+                    let completed = vm.nodeGroupConfigStates.filter { $0.state == .completed }.count
+                    let total = vm.nodeGroupConfigStates.count
+                    Text(total > 0 ? "\(completed) of \(total) devices" : "\(Int(vm.configProgress * 100))%")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
@@ -203,16 +197,104 @@ struct GroupConfigView: View {
                     .scaleEffect(x: 1, y: 1.5)
             }
 
-            if !vm.configStatus.isEmpty {
-                Text(vm.configStatus)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .animation(.default, value: vm.configStatus)
+            // Per-device rows
+            if !vm.nodeGroupConfigStates.isEmpty {
+                VStack(spacing: 6) {
+                    ForEach(vm.nodeGroupConfigStates) { nodeState in
+                        NodeGroupConfigRow(nodeState: nodeState)
+                    }
+                }
             }
         }
         .padding(24)
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+}
+
+// MARK: - Node Group Config Row
+
+private struct NodeGroupConfigRow: View {
+    let nodeState: NodeKeyBindingState
+
+    var body: some View {
+        HStack(spacing: 10) {
+            stateIcon
+            Text(nodeState.name)
+                .font(.subheadline)
+            Spacer()
+            stateLabel
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(rowBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(borderColor, lineWidth: 1)
+        )
+    }
+
+    private var stateIcon: some View {
+        ZStack {
+            Circle()
+                .fill(iconColor)
+                .frame(width: 24, height: 24)
+            Image(systemName: iconName)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.white)
+        }
+    }
+
+    private var iconName: String {
+        switch nodeState.state {
+        case .completed: "checkmark"
+        case .inProgress: "arrow.triangle.2.circlepath"
+        case .failed: "xmark"
+        case .pending: "clock"
+        }
+    }
+
+    private var iconColor: Color {
+        switch nodeState.state {
+        case .completed: .green
+        case .inProgress: .teal
+        case .failed: .red
+        case .pending: Color(.systemGray3)
+        }
+    }
+
+    private var rowBackground: Color {
+        switch nodeState.state {
+        case .completed: Color.green.opacity(0.05)
+        case .inProgress: Color.teal.opacity(0.05)
+        case .failed: Color.red.opacity(0.05)
+        case .pending: Color(.systemBackground)
+        }
+    }
+
+    private var borderColor: Color {
+        switch nodeState.state {
+        case .completed: Color.green.opacity(0.3)
+        case .inProgress: Color.teal.opacity(0.5)
+        case .failed: Color.red.opacity(0.3)
+        case .pending: Color(.separator)
+        }
+    }
+
+    private var stateLabel: some View {
+        Text(stateName)
+            .font(.caption)
+            .fontWeight(.medium)
+            .foregroundStyle(iconColor)
+    }
+
+    private var stateName: String {
+        switch nodeState.state {
+        case .completed: "Done"
+        case .inProgress: "Configuring…"
+        case .failed(let msg): msg
+        case .pending: "Waiting"
+        }
     }
 }
