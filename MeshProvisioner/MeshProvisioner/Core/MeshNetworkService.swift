@@ -233,7 +233,7 @@ final class MeshNetworkService: NSObject {
                 // Keep a strong reference — bearer.delegate is weak
                 activeBearerDelegates[device.id] = bridge
                 bearer.delegate = bridge
-                try bearer.open()
+                bearer.open()
             } catch {
                 provisioningContinuations.removeValue(forKey: device.id)
                 continuation.resume(throwing: AppError.provisioningFailed(error.localizedDescription))
@@ -735,12 +735,8 @@ extension MeshNetworkService: CBCentralManagerDelegate {
         proxyBearer = bearer
         manager.transmitter = bearer
         logger.info("🔌 Bearer delegate: \(bearer.delegate != nil), dataDelegate: \(bearer.dataDelegate != nil), transmitter: \(self.manager.transmitter != nil)")
-        do {
-            try bearer.open()
-            logger.info("🔌 Bearer.open() called successfully")
-        } catch {
-            logger.error("🔌 Failed to open proxy bearer: \(error)")
-        }
+        bearer.open()
+        logger.info("🔌 Bearer.open() called")
     }
 }
 
