@@ -35,6 +35,11 @@ final class MeshNetworkService: NSObject {
     var currentGroup: MeshGroupConfig?
     var error: Error?
 
+    // MARK: Group Config Progress
+
+    var groupConfigProgress: Double = 0
+    var groupConfigStatus: String = ""
+
     // MARK: Selection State (shared between screens)
 
     var selectedDevicesForProvisioning: [DiscoveredDevice] = []
@@ -439,27 +444,55 @@ final class MeshNetworkService: NSObject {
             retransmit: .disabled
         )
 
+        // Count total BLE operations upfront for progress reporting
+        var totalOps = 0
+        for node in nodes {
+            for element in node.elements {
+                for model in element.models {
+                    let mid = model.modelId
+                    guard mid != 0x0000 && mid != 0x0001 else { continue }
+                    if ConfigModelSubscriptionAdd(group: group, to: model) != nil { totalOps += 1 }
+                    if publishingModelIds.contains(mid) { totalOps += 1 }
+                }
+            }
+        }
+        totalOps = max(1, totalOps)
+        var completedOps = 0
+
+        groupConfigProgress = 0
+        groupConfigStatus = "Starting…"
+
         // Subscribe each node's non-config models to the group, and configure
         // publishing for status-reporting models.
-        for node in nodes {
+        for (nodeIndex, node) in nodes.enumerated() {
+            let nodeName = node.name ?? "Device \(nodeIndex + 1)"
             for element in node.elements {
                 for model in element.models {
                     let modelId = model.modelId
                     guard modelId != 0x0000 && modelId != 0x0001 else { continue }
                     if let msg = ConfigModelSubscriptionAdd(group: group, to: model) {
+                        groupConfigStatus = "Subscribing \(nodeName) to group…"
                         logger.info("🔧 Subscribing model 0x\(String(modelId, radix: 16)) to group \(name)")
                         await withTimeout { [manager] in _ = try await manager.send(msg, to: node) }
                         try? await Task.sleep(for: .milliseconds(200))
+                        completedOps += 1
+                        groupConfigProgress = Double(completedOps) / Double(totalOps)
                     }
                     if publishingModelIds.contains(modelId),
                        let msg = ConfigModelPublicationSet(publication, to: model) {
+                        groupConfigStatus = "Configuring publish on \(nodeName)…"
                         logger.info("🔧 Configuring publish for model 0x\(String(modelId, radix: 16)) → 0x\(String(groupAddress, radix: 16))")
                         await withTimeout { [manager] in _ = try await manager.send(msg, to: node) }
                         try? await Task.sleep(for: .milliseconds(200))
+                        completedOps += 1
+                        groupConfigProgress = Double(completedOps) / Double(totalOps)
                     }
                 }
             }
         }
+
+        groupConfigProgress = 1.0
+        groupConfigStatus = "Done"
 
         _ = manager.save()
 

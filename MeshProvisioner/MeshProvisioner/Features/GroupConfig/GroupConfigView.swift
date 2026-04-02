@@ -203,22 +203,13 @@ struct GroupConfigView: View {
                     .scaleEffect(x: 1, y: 1.5)
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(["Assigning group address",
-                         "Binding devices to group",
-                         "Configuring publication settings",
-                         "Connecting to proxy"], id: \.self) { step in
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(Color.teal)
-                            .frame(width: 8, height: 8)
-                        Text(step)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                }
+            if !vm.configStatus.isEmpty {
+                Text(vm.configStatus)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .animation(.default, value: vm.configStatus)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(24)
         .background(Color(.secondarySystemBackground))

@@ -9,7 +9,6 @@ final class GroupConfigViewModel {
 
     var roomName = "Living Room"
     var isConfiguring = false
-    var configProgress: Double = 0
     var errorMessage: String?
 
     let suggestedRooms = ["Living Room", "Bedroom", "Kitchen", "Office", "Bathroom", "Hallway"]
@@ -20,6 +19,8 @@ final class GroupConfigViewModel {
     }
 
     var devices: [DiscoveredDevice] { meshService.selectedDevicesForProvisioning }
+    var configProgress: Double { meshService.groupConfigProgress }
+    var configStatus: String { meshService.groupConfigStatus }
 
     func createGroup() {
         guard !isConfiguring, !roomName.trimmingCharacters(in: .whitespaces).isEmpty else { return }
@@ -28,16 +29,9 @@ final class GroupConfigViewModel {
     }
 
     private func runGroupConfig() async {
-        let steps = 4
-        for step in 1...steps {
-            configProgress = Double(step) / Double(steps)
-            try? await Task.sleep(for: .milliseconds(600))
-        }
-
         do {
             let nodes = meshService.provisionedNodes
             _ = try await meshService.configureGroup(name: roomName, nodes: nodes)
-            try? await Task.sleep(for: .milliseconds(400))
 
             // Ensure proxy is still connected for device control
             try? await meshService.connectToProxy()
