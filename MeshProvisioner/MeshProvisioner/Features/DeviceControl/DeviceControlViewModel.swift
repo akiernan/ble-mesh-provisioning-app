@@ -7,13 +7,12 @@ final class DeviceControlViewModel {
     private let meshService: MeshNetworkService
     private let router: AppRouter
 
-    /// Minimum interval between BLE sends while slider is being dragged.
-    private static let throttleInterval: Duration = .milliseconds(150)
-
-    /// Pending CTL values to send when the throttle window opens.
+    /// Most-recent slider values waiting to be sent. Overwritten on each slider
+    /// move so only the latest value is ever sent, preventing queue build-up.
     private var pendingLightness: Double?
     private var pendingTemperature: UInt16?
-    private var throttleTask: Task<Void, Never>?
+    /// True while an acknowledged CTL send is in-flight. New slider values
+    /// accumulate in pending* and are dispatched as soon as the ACK arrives.
     private var isSending = false
 
     var errorMessage: String?
@@ -59,7 +58,7 @@ final class DeviceControlViewModel {
         guard let group = meshService.currentGroup else { return }
         pendingLightness = lightness
         pendingTemperature = group.temperature
-        scheduleThrottledSend()
+        triggerSendIfIdle()
     }
 
     func setTemperature(_ temperature: Double) {
@@ -69,46 +68,36 @@ final class DeviceControlViewModel {
         guard let group = meshService.currentGroup else { return }
         pendingLightness = group.lightness
         pendingTemperature = kelvin
-        scheduleThrottledSend()
+        triggerSendIfIdle()
     }
 
     func restart() {
-        throttleTask?.cancel()
         meshService.resetMeshNetwork()
         router.popToRoot()
     }
 
-    // MARK: - Throttled Send
+    // MARK: - ACK-gated Send
 
-    /// Schedules a BLE send after the throttle interval. If a send is already
-    /// in flight, the pending values will be picked up when it completes.
-    private func scheduleThrottledSend() {
-        // If already waiting to send, the pending values are updated — nothing else needed.
-        guard throttleTask == nil else { return }
-
-        throttleTask = Task {
-            try? await Task.sleep(for: Self.throttleInterval)
-            guard !Task.isCancelled else { return }
-            await flushPendingCTL()
-            throttleTask = nil
-
-            // If new values arrived while we were sending, schedule another round.
-            if pendingLightness != nil {
-                scheduleThrottledSend()
-            }
-        }
+    private func triggerSendIfIdle() {
+        guard !isSending else { return }
+        isSending = true
+        Task { await sendLoop() }
     }
 
-    private func flushPendingCTL() async {
-        guard let lightness = pendingLightness,
-              let temperature = pendingTemperature else { return }
-        pendingLightness = nil
-        pendingTemperature = nil
-
-        do {
-            try await meshService.setLightCTL(lightness: lightness, temperature: temperature)
-        } catch {
-            errorMessage = error.localizedDescription
+    /// Drains pending CTL values one at a time. A minimum gap between sends
+    /// prevents the BLE bearer from being flooded with queued messages.
+    private func sendLoop() async {
+        while let lightness = pendingLightness, let temperature = pendingTemperature {
+            pendingLightness = nil
+            pendingTemperature = nil
+            do {
+                try await meshService.setLightCTL(lightness: lightness, temperature: temperature)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            // Give the bearer time to transmit before we send the next value.
+            try? await Task.sleep(for: .milliseconds(100))
         }
+        isSending = false
     }
 }

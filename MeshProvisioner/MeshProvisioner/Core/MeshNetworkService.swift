@@ -665,8 +665,6 @@ final class MeshNetworkService: NSObject {
         let rangeMin = currentGroup?.temperatureRangeMin ?? MeshGroupConfig.temperatureMin
         let rangeMax = currentGroup?.temperatureRangeMax ?? MeshGroupConfig.temperatureMax
         let clampedTemp = max(rangeMin, min(rangeMax, temperature))
-        // Transition time matches the throttle interval so the device
-        // smoothly interpolates between successive slider updates.
         let transition = TransitionTime(steps: 2, stepResolution: .hundredsOfMilliseconds) // 200ms
         let message = LightCTLSetUnacknowledged(lightness: lightnessValue,
                                                 temperature: clampedTemp,
