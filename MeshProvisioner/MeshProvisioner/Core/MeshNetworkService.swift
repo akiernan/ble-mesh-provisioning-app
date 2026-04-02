@@ -536,37 +536,8 @@ final class MeshNetworkService: NSObject {
             throw AppError.groupConfigFailed("No application key available")
         }
 
-        // GenericOnOffServer publishes to our provisioner unicast so the app receives
-        // power state updates from the external switch without causing a group relay flood.
-        // GenericPowerOnOffServer (startup state) does not need to publish.
-        let onOffPublishingModelIds: Set<UInt32> = [
-            UInt32(UInt16.genericOnOffServerModelId),
-        ]
-        // CTL and Lightness publish to the group so the proxy filter can forward them.
-        let groupPublishingModelIds: Set<UInt32> = [
-            UInt32(UInt16.lightLightnessServerModelId),
-            UInt32(UInt16.lightCTLServerModelId),
-        ]
-
-        let provisionerAddress = network.localProvisioner?.node?.primaryUnicastAddress ?? 0x0001
-        // OnOff status → provisioner unicast; avoids relay flood.
-        let onOffPublication = Publish(
-            to: MeshAddress(provisionerAddress),
-            using: appKey,
-            usingFriendshipMaterial: false,
-            ttl: 5,
-            period: .disabled,
-            retransmit: .disabled
-        )
-        // CTL/Lightness status → group address (proxy filter forwards it to us).
-        let publication = Publish(
-            to: MeshAddress(groupAddress),
-            using: appKey,
-            usingFriendshipMaterial: false,
-            ttl: 5,
-            period: .disabled,
-            retransmit: .disabled
-        )
+        // No publication configured for any model — nodes only respond to commands,
+        // they do not proactively publish status.
 
         // Count total BLE operations upfront for progress reporting
         var totalOps = 0
@@ -576,7 +547,6 @@ final class MeshNetworkService: NSObject {
                     let mid = model.modelId
                     guard mid != 0x0000 && mid != 0x0001 else { continue }
                     if ConfigModelSubscriptionAdd(group: group, to: model) != nil { totalOps += 1 }
-                    if onOffPublishingModelIds.contains(mid) || groupPublishingModelIds.contains(mid) { totalOps += 1 }
                 }
             }
         }
@@ -603,20 +573,6 @@ final class MeshNetworkService: NSObject {
                     if let msg = ConfigModelSubscriptionAdd(group: group, to: model) {
                         groupConfigStatus = "Subscribing \(nodeName) to group…"
                         logger.info("🔧 Subscribing model 0x\(String(modelId, radix: 16)) to group \(name)")
-                        await sendConfig(msg, to: node)
-                        try? await Task.sleep(for: .milliseconds(200))
-                        completedOps += 1
-                        groupConfigProgress = Double(completedOps) / Double(totalOps)
-                    }
-                    let pubToUse: Publish? = onOffPublishingModelIds.contains(modelId) ? onOffPublication
-                                           : groupPublishingModelIds.contains(modelId) ? publication
-                                           : nil
-                    if let pub = pubToUse, let msg = ConfigModelPublicationSet(pub, to: model) {
-                        let destHex = onOffPublishingModelIds.contains(modelId)
-                            ? String(provisionerAddress, radix: 16)
-                            : String(groupAddress, radix: 16)
-                        groupConfigStatus = "Configuring publish on \(nodeName)…"
-                        logger.info("🔧 Configuring publish for model 0x\(String(modelId, radix: 16)) → 0x\(destHex)")
                         await sendConfig(msg, to: node)
                         try? await Task.sleep(for: .milliseconds(200))
                         completedOps += 1
