@@ -108,6 +108,10 @@ struct MeshGroupConfig: Identifiable, Hashable {
     var temperatureRangeMin: UInt16 = MeshGroupConfig.temperatureMin
     var temperatureRangeMax: UInt16 = MeshGroupConfig.temperatureMax
 
+    /// Lightness range as 0.0–1.0. Min defaults to 1% so the slider never sends 0 (off).
+    var lightnessRangeMin: Double = 0.01
+    var lightnessRangeMax: Double = 1.0
+
     var lightnessUInt16: UInt16 { UInt16(lightness * 65535) }
 
     func temperatureLabel() -> String {

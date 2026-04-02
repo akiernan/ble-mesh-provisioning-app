@@ -516,7 +516,9 @@ final class MeshNetworkService: NSObject {
         }
         try await connectToProxy()
         let dest = MeshAddress(group.groupAddress)
-        let lightnessValue = UInt16(max(0.0, min(1.0, lightness)) * 65535)
+        let lMin = currentGroup?.lightnessRangeMin ?? 0.01
+        let lMax = currentGroup?.lightnessRangeMax ?? 1.0
+        let lightnessValue = UInt16(max(lMin, min(lMax, lightness)) * 65535)
         let rangeMin = currentGroup?.temperatureRangeMin ?? MeshGroupConfig.temperatureMin
         let rangeMax = currentGroup?.temperatureRangeMax ?? MeshGroupConfig.temperatureMax
         let clampedTemp = max(rangeMin, min(rangeMax, temperature))
@@ -591,6 +593,26 @@ final class MeshNetworkService: NSObject {
                 }
             } catch {
                 logger.warning("🔄 Failed to query CTL state: \(error)")
+            }
+        }
+
+        // Query Light Lightness range
+        if let lightnessServer = node.elements.lazy
+            .compactMap({ $0.model(withSigModelId: .lightLightnessServerModelId) }).first {
+            do {
+                let response = try await manager.send(LightLightnessRangeGet(), to: lightnessServer)
+                if let status = response as? LightLightnessRangeStatus, status.min > 0 {
+                    let rMin = Double(status.min) / 65535.0
+                    let rMax = Double(status.max) / 65535.0
+                    logger.info("🔄 Lightness range: \(Int(rMin * 100))%–\(Int(rMax * 100))%")
+                    currentGroup?.lightnessRangeMin = rMin
+                    currentGroup?.lightnessRangeMax = rMax
+                    if let l = currentGroup?.lightness {
+                        currentGroup?.lightness = max(rMin, min(rMax, l))
+                    }
+                }
+            } catch {
+                logger.warning("🔄 Failed to query lightness range: \(error)")
             }
         }
 
@@ -824,6 +846,16 @@ extension MeshNetworkService: MeshNetworkDelegate {
                     self.currentGroup?.temperature = max(status.min, min(status.max, temp))
                 }
             }
+            if let status = message as? LightLightnessRangeStatus, status.min > 0 {
+                let rMin = Double(status.min) / 65535.0
+                let rMax = Double(status.max) / 65535.0
+                logger.info("🔄 Lightness range: \(Int(rMin * 100))%–\(Int(rMax * 100))%")
+                self.currentGroup?.lightnessRangeMin = rMin
+                self.currentGroup?.lightnessRangeMax = rMax
+                if let l = self.currentGroup?.lightness {
+                    self.currentGroup?.lightness = max(rMin, min(rMax, l))
+                }
+            }
         }
     }
 
@@ -919,6 +951,7 @@ private class LightControlClientDelegate: ModelDelegate {
             GenericOnOffStatus.opCode: GenericOnOffStatus.self,
             LightCTLStatus.opCode: LightCTLStatus.self,
             LightCTLTemperatureRangeStatus.opCode: LightCTLTemperatureRangeStatus.self,
+            LightLightnessRangeStatus.opCode: LightLightnessRangeStatus.self,
         ]
     }
 
