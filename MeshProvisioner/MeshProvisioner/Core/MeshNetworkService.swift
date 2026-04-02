@@ -799,7 +799,7 @@ extension MeshNetworkService: ProvisioningDelegate {
                 guard let pm = activeProvisioningManagers[id] else { break }
                 do {
                     try pm.provision(
-                        usingAlgorithm: .fipsP256EllipticCurve,
+                        usingAlgorithm: .BTM_ECDH_P256_CMAC_AES128_AES_CCM,
                         publicKey: .noOobPublicKey,
                         authenticationMethod: .noOob
                     )
