@@ -137,6 +137,8 @@ struct NodeKeyBindingState: Identifiable {
 
 enum SIGModelID {
     static let genericOnOffServer: UInt16 = 0x1000
+    static let genericPowerOnOffServer: UInt16 = 0x1006
+    static let genericPowerOnOffSetupServer: UInt16 = 0x1007
     static let lightLightnessServer: UInt16 = 0x1300
     static let lightCTLServer: UInt16 = 0x1303
     static let lightCTLTemperatureServer: UInt16 = 0x1306
