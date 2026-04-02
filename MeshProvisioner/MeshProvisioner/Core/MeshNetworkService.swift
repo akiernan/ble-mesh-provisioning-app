@@ -190,6 +190,7 @@ final class MeshNetworkService: NSObject {
             await sendConfig(ConfigNodeReset(), to: node)
             nodeResetCompleted += 1
         }
+        try? await Task.sleep(for: .milliseconds(800))
         isResettingNodes = false
         resetMeshNetwork()
     }
