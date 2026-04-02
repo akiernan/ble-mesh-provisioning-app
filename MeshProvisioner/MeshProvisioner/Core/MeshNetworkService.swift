@@ -44,6 +44,12 @@ final class MeshNetworkService: NSObject {
 
     var nodeKeyBindingStates: [NodeKeyBindingState] = []
 
+    // MARK: Node Reset Progress
+
+    var isResettingNodes = false
+    var nodeResetCompleted = 0
+    var nodeResetTotal = 0
+
     // MARK: Selection State (shared between screens)
 
     var selectedDevicesForProvisioning: [DiscoveredDevice] = []
@@ -170,6 +176,22 @@ final class MeshNetworkService: NSObject {
     /// meaning the app can skip directly to the device control screen.
     var hasProvisionedNetwork: Bool {
         currentGroup != nil && !provisionedNodes.isEmpty
+    }
+
+    /// Sends ConfigNodeReset to every provisioned node (so they return to
+    /// unprovisioned state and can be discovered again), then wipes local state.
+    func factoryResetAllNodes() async {
+        let nodes = provisionedNodes
+        isResettingNodes = true
+        nodeResetTotal = nodes.count
+        nodeResetCompleted = 0
+        for node in nodes {
+            logger.info("🔄 Sending ConfigNodeReset to \(node.name ?? "?")")
+            await sendConfig(ConfigNodeReset(), to: node)
+            nodeResetCompleted += 1
+        }
+        isResettingNodes = false
+        resetMeshNetwork()
     }
 
     /// Wipes the persisted mesh network and resets all state so the user can

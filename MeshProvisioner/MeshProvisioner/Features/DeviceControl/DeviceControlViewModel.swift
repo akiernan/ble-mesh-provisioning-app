@@ -29,6 +29,10 @@ final class DeviceControlViewModel {
         meshService.provisionedNodes.map { $0.name ?? "Mesh Node" }
     }
 
+    var isResetting: Bool { meshService.isResettingNodes }
+    var resetCompleted: Int { meshService.nodeResetCompleted }
+    var resetTotal: Int { meshService.nodeResetTotal }
+
     func connectIfNeeded() {
         Task {
             do {
@@ -72,8 +76,10 @@ final class DeviceControlViewModel {
     }
 
     func restart() {
-        meshService.resetMeshNetwork()
-        router.popToRoot()
+        Task {
+            await meshService.factoryResetAllNodes()
+            router.popToRoot()
+        }
     }
 
     // MARK: - ACK-gated Send

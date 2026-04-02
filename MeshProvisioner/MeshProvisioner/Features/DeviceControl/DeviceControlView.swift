@@ -24,6 +24,11 @@ struct DeviceControlView: View {
         }
         .navigationBarBackButtonHidden(true)
         .navigationTitle("")
+        .overlay {
+            if let vm = viewModel, vm.isResetting {
+                resetProgressOverlay(vm: vm)
+            }
+        }
         .alert("Reset Mesh Network?", isPresented: $showResetConfirm) {
             Button("Reset", role: .destructive) {
                 viewModel?.restart()
@@ -298,6 +303,34 @@ struct DeviceControlView: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color(.separator), lineWidth: 1)
         )
+    }
+
+    // MARK: - Reset Progress Overlay
+
+    private func resetProgressOverlay(vm: DeviceControlViewModel) -> some View {
+        ZStack {
+            Color.black.opacity(0.5)
+                .ignoresSafeArea()
+            VStack(spacing: 20) {
+                ProgressView(value: vm.resetTotal > 0 ? Double(vm.resetCompleted) / Double(vm.resetTotal) : 0)
+                    .progressViewStyle(.linear)
+                    .tint(.white)
+                    .frame(width: 200)
+                ProgressView()
+                    .tint(.white)
+                VStack(spacing: 6) {
+                    Text("Resetting Devices")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                    Text("\(vm.resetCompleted) of \(vm.resetTotal)")
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+            }
+            .padding(32)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+        }
     }
 
     // MARK: - Mesh info card
