@@ -44,6 +44,8 @@ final class ProvisioningViewModel {
     }
 
     private func runProvisioning() async {
+        // Clear any stale nodes from a previous partial run before provisioning new devices.
+        meshService.provisionedNodes = []
         for (index, device) in devices.enumerated() {
             currentIndex = index
             meshService.provisioningStates[device.id] = .inProgress(progress: 0)

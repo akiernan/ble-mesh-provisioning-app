@@ -74,10 +74,20 @@ struct KeyBindingView: View {
                 // Steps
                 VStack(spacing: 12) {
                     ForEach(KeyBindingStep.allCases, id: \.self) { step in
-                        KeyBindingStepRow(
-                            step: step,
-                            state: vm.stepStates[step] ?? .pending
-                        )
+                        VStack(spacing: 6) {
+                            KeyBindingStepRow(
+                                step: step,
+                                state: vm.stepStates[step] ?? .pending
+                            )
+                            if step == .distributeKeys && !vm.nodeKeyBindingStates.isEmpty {
+                                VStack(spacing: 4) {
+                                    ForEach(vm.nodeKeyBindingStates) { nodeState in
+                                        NodeKeyBindingRow(nodeState: nodeState)
+                                    }
+                                }
+                                .padding(.leading, 20)
+                            }
+                        }
                     }
                 }
 
@@ -139,6 +149,93 @@ struct KeyBindingView: View {
         .padding()
         .background(Color.green.opacity(0.1))
         .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+// MARK: - Node Key Binding Row
+
+private struct NodeKeyBindingRow: View {
+    let nodeState: NodeKeyBindingState
+
+    var body: some View {
+        HStack(spacing: 10) {
+            stateIcon
+            Text(nodeState.name)
+                .font(.subheadline)
+            Spacer()
+            stateLabel
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(rowBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(borderColor, lineWidth: 1)
+        )
+    }
+
+    private var stateIcon: some View {
+        ZStack {
+            Circle()
+                .fill(iconColor)
+                .frame(width: 24, height: 24)
+            Image(systemName: iconName)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.white)
+        }
+    }
+
+    private var iconName: String {
+        switch nodeState.state {
+        case .completed: "checkmark"
+        case .inProgress: "arrow.triangle.2.circlepath"
+        case .failed: "xmark"
+        case .pending: "clock"
+        }
+    }
+
+    private var iconColor: Color {
+        switch nodeState.state {
+        case .completed: .green
+        case .inProgress: .orange
+        case .failed: .red
+        case .pending: Color(.systemGray3)
+        }
+    }
+
+    private var rowBackground: Color {
+        switch nodeState.state {
+        case .completed: Color.green.opacity(0.05)
+        case .inProgress: Color.orange.opacity(0.05)
+        case .failed: Color.red.opacity(0.05)
+        case .pending: Color(.systemBackground)
+        }
+    }
+
+    private var borderColor: Color {
+        switch nodeState.state {
+        case .completed: Color.green.opacity(0.3)
+        case .inProgress: Color.orange.opacity(0.5)
+        case .failed: Color.red.opacity(0.3)
+        case .pending: Color(.separator)
+        }
+    }
+
+    private var stateLabel: some View {
+        Text(stateName)
+            .font(.caption)
+            .fontWeight(.medium)
+            .foregroundStyle(iconColor)
+    }
+
+    private var stateName: String {
+        switch nodeState.state {
+        case .completed: "Done"
+        case .inProgress: "Sending…"
+        case .failed(let msg): msg
+        case .pending: "Waiting"
+        }
     }
 }
 

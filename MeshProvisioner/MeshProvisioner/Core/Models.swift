@@ -125,6 +125,14 @@ struct MeshGroupConfig: Identifiable, Hashable {
     }
 }
 
+// MARK: - Node Key Binding State
+
+struct NodeKeyBindingState: Identifiable {
+    let id: UUID
+    let name: String
+    var state: KeyBindingStepState
+}
+
 // MARK: - Bluetooth Mesh SIG Model IDs
 
 enum SIGModelID {

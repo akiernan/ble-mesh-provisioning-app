@@ -40,6 +40,10 @@ final class MeshNetworkService: NSObject {
     var groupConfigProgress: Double = 0
     var groupConfigStatus: String = ""
 
+    // MARK: Per-Node Key Binding Progress
+
+    var nodeKeyBindingStates: [NodeKeyBindingState] = []
+
     // MARK: Selection State (shared between screens)
 
     var selectedDevicesForProvisioning: [DiscoveredDevice] = []
@@ -49,6 +53,7 @@ final class MeshNetworkService: NSObject {
 
     private let manager: MeshNetworkManager
     private var scannerCentralManager: CBCentralManager!
+    private let clientDelegate = LightControlClientDelegate()
 
     // Provisioning helpers – each device gets its own PBGattBearer (own central manager)
     private var activeProvisioningManagers: [UUID: ProvisioningManager] = [:]
@@ -59,6 +64,13 @@ final class MeshNetworkService: NSObject {
     // Peripheral UUID → device UUID mapping (for scanning results)
     private var peripheralIDToDeviceID: [UUID: UUID] = [:]
     private var discoveredPeripheralMeshData: [UUID: Data] = [:]
+
+    // Config message response continuations.
+    // Keyed on (source unicast address, response opCode) — resolved from the delegate
+    // when any message (including UnknownMessage) with the matching opCode arrives.
+    // This works around manager.send() continuations not resolving when responses
+    // arrive as UnknownMessage due to the ConfigurationClientHandler not decoding them.
+    private var pendingConfigContinuations: [ConfigContinuationKey: CheckedContinuation<Void, Never>] = [:]
 
     // Proxy connection
     private var proxyBearer: GattBearer?
@@ -73,10 +85,13 @@ final class MeshNetworkService: NSObject {
         manager.delegate = self
         manager.logger = self
         setupMeshNetwork()
-        // Setting localElements triggers the setter which installs foundation
-        // model delegates (ConfigurationClientHandler, etc.) AND our client model
-        // delegates for decoding GenericOnOffStatus / LightCTLStatus responses.
-        let clientDelegate = LightControlClientDelegate()
+        setupLocalElements()
+    }
+
+    /// Installs local element models on the current mesh network.
+    /// Must be called after every setupMeshNetwork() so the ConfigurationClientHandler
+    /// is registered and can decode composition data / config response messages.
+    private func setupLocalElements() {
         manager.localElements = [
             Element(name: "Primary Element", location: .unknown, models: [
                 Model(sigModelId: .genericOnOffClientModelId, delegate: clientDelegate),
@@ -187,12 +202,14 @@ final class MeshNetworkService: NSObject {
         keyBindingStepStates = Dictionary(uniqueKeysWithValues: KeyBindingStep.allCases.map { ($0, .pending) })
         groupConfigProgress = 0
         groupConfigStatus = ""
+        nodeKeyBindingStates = []
         error = nil
         peripheralIDToDeviceID = [:]
         discoveredPeripheralMeshData = [:]
 
-        // Create a fresh network
+        // Create a fresh network and reinstall model delegates
         setupMeshNetwork()
+        setupLocalElements()
         logger.info("Mesh network reset to factory defaults")
     }
 
@@ -318,6 +335,31 @@ final class MeshNetworkService: NSObject {
 
     // MARK: - Message Sending
 
+    /// Sends an acknowledged config message and waits until the expected response
+    /// opCode arrives from that node (or 8 seconds elapse).
+    ///
+    /// This works around the library bug where `manager.send()` never resolves when
+    /// the device's response arrives as `UnknownMessage`: we match on the raw opCode
+    /// value directly in our delegate callback, which fires regardless of type.
+    private func sendConfig(_ message: AcknowledgedConfigMessage, to node: Node) async {
+        let key = ConfigContinuationKey(
+            sourceAddress: node.primaryUnicastAddress,
+            responseOpCode: message.responseOpCode
+        )
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            pendingConfigContinuations[key] = cont
+            Task { [manager] in _ = try? await manager.send(message, to: node) }
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(8))
+                guard let self else { return }
+                if let cont = pendingConfigContinuations.removeValue(forKey: key) {
+                    logger.warning("🔧 Config send to 0x\(String(node.primaryUnicastAddress, radix: 16)) timed out")
+                    cont.resume()
+                }
+            }
+        }
+    }
+
     /// Runs an async operation with a timeout. If the timeout fires first, execution
     /// continues immediately — the operation is left running in the background but
     /// does not block progress. This is critical because `manager.send()` can hang
@@ -372,7 +414,13 @@ final class MeshNetworkService: NSObject {
 
         // Step 2: Distribute keys – fetch composition data then send ConfigAppKeyAdd
         keyBindingStepStates[.distributeKeys] = .inProgress
+        nodeKeyBindingStates = nodes.map {
+            NodeKeyBindingState(id: $0.uuid, name: $0.name ?? "Mesh Node", state: .pending)
+        }
         for node in nodes {
+            if let idx = nodeKeyBindingStates.firstIndex(where: { $0.id == node.uuid }) {
+                nodeKeyBindingStates[idx].state = .inProgress
+            }
             logger.info("🔧 Processing node: \(node.name ?? "unknown"), unicast: 0x\(String(node.primaryUnicastAddress, radix: 16)), elements: \(node.elements.count)")
             logger.info("🔧 Proxy connected: \(self.isConnectedToProxy), transmitter: \(self.manager.transmitter != nil), bearer: \(self.proxyBearer != nil)")
 
@@ -383,11 +431,8 @@ final class MeshNetworkService: NSObject {
             if !hasModels {
                 logger.info("🔧 Sending ConfigCompositionDataGet to node 0x\(String(node.primaryUnicastAddress, radix: 16)) (\(node.elements.count) elements, no models)...")
                 let compositionGet = ConfigCompositionDataGet(page: 0)
-                await withTimeout(.seconds(10)) { [manager] in
-                    logger.info("🔧 manager.send(CompositionDataGet) — awaiting response...")
-                    let response = try await manager.send(compositionGet, to: node)
-                    logger.info("🔧 CompositionDataGet response: \(type(of: response))")
-                }
+                logger.info("🔧 manager.send(CompositionDataGet) — awaiting response...")
+                await sendConfig(compositionGet, to: node)
                 try? await Task.sleep(for: .milliseconds(500))
                 logger.info("🔧 After CompositionDataGet — node elements: \(node.elements.count)")
                 for (i, element) in node.elements.enumerated() {
@@ -400,11 +445,11 @@ final class MeshNetworkService: NSObject {
 
             logger.info("🔧 Sending ConfigAppKeyAdd to node 0x\(String(node.primaryUnicastAddress, radix: 16))...")
             let request = ConfigAppKeyAdd(applicationKey: appKey)
-            await withTimeout { [manager] in
-                let response = try await manager.send(request, to: node)
-                logger.info("🔧 AppKeyAdd response: \(type(of: response))")
-            }
+            await sendConfig(request, to: node)
             try? await Task.sleep(for: .milliseconds(200))
+            if let idx = nodeKeyBindingStates.firstIndex(where: { $0.id == node.uuid }) {
+                nodeKeyBindingStates[idx].state = .completed
+            }
         }
         keyBindingStepStates[.distributeKeys] = .completed
 
@@ -425,11 +470,8 @@ final class MeshNetworkService: NSObject {
                     guard modelId != 0x0000 && modelId != 0x0001 else { continue } // skip config server/client
                     if let bindMsg = ConfigModelAppBind(applicationKey: appKey, to: model) {
                         logger.info("🔧 Binding app key to model 0x\(String(modelId, radix: 16)) on element \(i)")
-                        await withTimeout { [manager] in
-                            let response = try await manager.send(bindMsg, to: node)
-                            logger.info("🔧 ModelAppBind response: \(type(of: response))")
-                        }
-                        try? await Task.sleep(for: .milliseconds(200))
+                        await sendConfig(bindMsg, to: node)
+                        try? await Task.sleep(for: .milliseconds(100))
                     }
                 }
             }
@@ -512,7 +554,7 @@ final class MeshNetworkService: NSObject {
                     if let msg = ConfigModelSubscriptionAdd(group: group, to: model) {
                         groupConfigStatus = "Subscribing \(nodeName) to group…"
                         logger.info("🔧 Subscribing model 0x\(String(modelId, radix: 16)) to group \(name)")
-                        await withTimeout { [manager] in _ = try await manager.send(msg, to: node) }
+                        await sendConfig(msg, to: node)
                         try? await Task.sleep(for: .milliseconds(200))
                         completedOps += 1
                         groupConfigProgress = Double(completedOps) / Double(totalOps)
@@ -521,7 +563,7 @@ final class MeshNetworkService: NSObject {
                        let msg = ConfigModelPublicationSet(publication, to: model) {
                         groupConfigStatus = "Configuring publish on \(nodeName)…"
                         logger.info("🔧 Configuring publish for model 0x\(String(modelId, radix: 16)) → 0x\(String(groupAddress, radix: 16))")
-                        await withTimeout { [manager] in _ = try await manager.send(msg, to: node) }
+                        await sendConfig(msg, to: node)
                         try? await Task.sleep(for: .milliseconds(200))
                         completedOps += 1
                         groupConfigProgress = Double(completedOps) / Double(totalOps)
@@ -923,7 +965,16 @@ extension MeshNetworkService: MeshNetworkDelegate {
                                          to destination: MeshAddress) {
         // Ignore loopback — messages we sent to a group that echo back via the proxy filter
         guard source != manager.meshNetwork?.localProvisioner?.primaryUnicastAddress else { return }
-        logger.info("📩 RECEIVED \(type(of: message)) from 0x\(String(source, radix: 16)) to 0x\(String(destination.address, radix: 16))")
+        logger.info("📩 RECEIVED \(type(of: message)) opCode=0x\(String(message.opCode, radix: 16)) from 0x\(String(source, radix: 16)) to 0x\(String(destination.address, radix: 16))")
+
+        // Resolve any config continuation waiting for this opCode from this node.
+        // Works even when the library delivers the response as UnknownMessage.
+        let configKey = ConfigContinuationKey(sourceAddress: source, responseOpCode: message.opCode)
+        Task { @MainActor in
+            if let cont = pendingConfigContinuations.removeValue(forKey: configKey) {
+                cont.resume()
+            }
+        }
         if message is ConfigCompositionDataStatus {
             logger.info("📩 Got composition data response!")
         }
@@ -1040,6 +1091,13 @@ private final class OnceGate: @unchecked Sendable {
     }
 }
 
+// MARK: - ConfigContinuationKey
+
+private struct ConfigContinuationKey: Hashable {
+    let sourceAddress: UInt16
+    let responseOpCode: UInt32
+}
+
 // MARK: - LightControlClientDelegate
 
 /// Model delegate for local GenericOnOff Client and LightCTL Client models.
@@ -1052,10 +1110,20 @@ private class LightControlClientDelegate: ModelDelegate {
 
     init() {
         self.messageTypes = [
+            // Application-level status messages
             GenericOnOffStatus.opCode: GenericOnOffStatus.self,
             LightCTLStatus.opCode: LightCTLStatus.self,
             LightCTLTemperatureRangeStatus.opCode: LightCTLTemperatureRangeStatus.self,
             LightLightnessRangeStatus.opCode: LightLightnessRangeStatus.self,
+            // Configuration response messages — registering these opcodes here ensures
+            // the library decodes them as typed messages rather than UnknownMessage,
+            // which allows the manager.send() continuations to resolve immediately
+            // instead of falling back to the 8-second withTimeout.
+            ConfigCompositionDataStatus.opCode: ConfigCompositionDataStatus.self,
+            ConfigAppKeyStatus.opCode: ConfigAppKeyStatus.self,
+            ConfigModelAppStatus.opCode: ConfigModelAppStatus.self,
+            ConfigModelSubscriptionStatus.opCode: ConfigModelSubscriptionStatus.self,
+            ConfigModelPublicationStatus.opCode: ConfigModelPublicationStatus.self,
         ]
     }
 

@@ -16,6 +16,7 @@ final class KeyBindingViewModel {
     }
 
     var stepStates: [KeyBindingStep: KeyBindingStepState] { meshService.keyBindingStepStates }
+    var nodeKeyBindingStates: [NodeKeyBindingState] { meshService.nodeKeyBindingStates }
 
     var progress: Double {
         let total = KeyBindingStep.allCases.count
