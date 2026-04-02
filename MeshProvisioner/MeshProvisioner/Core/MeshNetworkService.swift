@@ -546,7 +546,8 @@ final class MeshNetworkService: NSObject {
         let dest = MeshAddress(group.groupAddress)
         let lMin = currentGroup?.lightnessRangeMin ?? 0.01
         let lMax = currentGroup?.lightnessRangeMax ?? 1.0
-        let lightnessValue = UInt16(max(lMin, min(lMax, lightness)) * 65535)
+        let clamped = lightness <= 0 ? 0.0 : max(lMin, min(lMax, lightness))
+        let lightnessValue = UInt16(clamped * 65535)
         let rangeMin = currentGroup?.temperatureRangeMin ?? MeshGroupConfig.temperatureMin
         let rangeMax = currentGroup?.temperatureRangeMax ?? MeshGroupConfig.temperatureMax
         let clampedTemp = max(rangeMin, min(rangeMax, temperature))
