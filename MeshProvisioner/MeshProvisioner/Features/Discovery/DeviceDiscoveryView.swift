@@ -128,13 +128,13 @@ struct DeviceDiscoveryView: View {
             Button {
                 vm.continueToProvisioning()
             } label: {
-                Text("Continue with \(vm.selectedCount) device\(vm.selectedCount == 1 ? "" : "s")")
+                Text("Continue with \(vm.selectedDevices.count) device\(vm.selectedDevices.count == 1 ? "" : "s")")
                     .font(.headline)
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
                     .background(
-                        vm.selectedCount > 0
+                        vm.selectedDevices.count > 0
                         ? LinearGradient(colors: [.blue, .cyan],
                                          startPoint: .leading, endPoint: .trailing)
                         : LinearGradient(colors: [Color(.systemGray4), Color(.systemGray4)],
@@ -142,7 +142,7 @@ struct DeviceDiscoveryView: View {
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 14))
             }
-            .disabled(vm.selectedCount == 0)
+            .disabled(vm.selectedDevices.count == 0)
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
             .background(.regularMaterial)
