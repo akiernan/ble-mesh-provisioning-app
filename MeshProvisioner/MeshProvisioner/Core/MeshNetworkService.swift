@@ -418,7 +418,29 @@ final class MeshNetworkService: NSObject {
             }
         }
 
-        // Subscribe each node's non-config models to the group
+        guard let appKey = network.applicationKeys.first else {
+            throw AppError.groupConfigFailed("No application key available")
+        }
+
+        // Model IDs that should publish state-change notifications
+        let publishingModelIds: Set<UInt32> = [
+            UInt32(UInt16.genericOnOffServerModelId),
+            UInt32(UInt16.lightLightnessServerModelId),
+            UInt32(UInt16.lightCTLServerModelId),
+        ]
+
+        // Publish on state-change only (no periodic), TTL 5, no retransmit
+        let publication = Publish(
+            to: MeshAddress(groupAddress),
+            using: appKey,
+            usingFriendshipMaterial: false,
+            ttl: 5,
+            period: .disabled,
+            retransmit: .disabled
+        )
+
+        // Subscribe each node's non-config models to the group, and configure
+        // publishing for status-reporting models.
         for node in nodes {
             for element in node.elements {
                 for model in element.models {
@@ -426,6 +448,12 @@ final class MeshNetworkService: NSObject {
                     guard modelId != 0x0000 && modelId != 0x0001 else { continue }
                     if let msg = ConfigModelSubscriptionAdd(group: group, to: model) {
                         logger.info("🔧 Subscribing model 0x\(String(modelId, radix: 16)) to group \(name)")
+                        await withTimeout { [manager] in _ = try await manager.send(msg, to: node) }
+                        try? await Task.sleep(for: .milliseconds(200))
+                    }
+                    if publishingModelIds.contains(modelId),
+                       let msg = ConfigModelPublicationSet(publication, to: model) {
+                        logger.info("🔧 Configuring publish for model 0x\(String(modelId, radix: 16)) → 0x\(String(groupAddress, radix: 16))")
                         await withTimeout { [manager] in _ = try await manager.send(msg, to: node) }
                         try? await Task.sleep(for: .milliseconds(200))
                     }
@@ -552,6 +580,13 @@ final class MeshNetworkService: NSObject {
         }
 
         guard let appKey = manager.meshNetwork?.applicationKeys.first else { return }
+
+        // Add the group address to the proxy filter so published status messages
+        // from the device are forwarded to this app over the GATT proxy.
+        if let groupAddress = currentGroup?.groupAddress {
+            manager.proxyFilter.add(address: groupAddress)
+            logger.info("🔄 Added group 0x\(String(groupAddress, radix: 16)) to proxy filter")
+        }
 
         // Bind the app key to local client models (persisted after first run)
         let localElement = manager.localElements.first
