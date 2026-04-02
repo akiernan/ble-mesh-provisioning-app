@@ -218,7 +218,7 @@ struct DeviceControlView: View {
                     set: { vm.setTemperature($0) }
                 ),
                 in: minTemp...maxTemp,
-                step: 100
+                step: 1
             )
             .tint(.clear)
         }
