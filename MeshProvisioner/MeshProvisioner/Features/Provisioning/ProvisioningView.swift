@@ -70,11 +70,10 @@ struct ProvisioningView: View {
                             .foregroundStyle(.secondary)
                     }
                     ProgressView(value: vm.totalProgress)
-                        .tint(
-                            LinearGradient(colors: [.purple, .pink],
-                                           startPoint: .leading, endPoint: .trailing)
-                        )
-                        .scaleEffect(x: 1, y: 1.5)
+                        .progressViewStyle(GradientProgressStyle(
+                            gradient: LinearGradient(colors: [.purple, .pink],
+                                                     startPoint: .leading, endPoint: .trailing)
+                        ))
                         .accessibilityLabel("Overall progress")
                         .accessibilityValue("\(vm.completedCount) of \(vm.devices.count) complete")
                 }

@@ -22,6 +22,7 @@
 		AAAA00000000000000000117 /* GroupConfigViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000116 /* GroupConfigViewModel.swift */; };
 		AAAA00000000000000000119 /* DeviceControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000118 /* DeviceControlView.swift */; };
 		AAAA0000000000000000011B /* DeviceControlViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA0000000000000000011A /* DeviceControlViewModel.swift */; };
+		AAAA0000000000000000011E /* GradientProgressStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA0000000000000000011D /* GradientProgressStyle.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -41,6 +42,7 @@
 		AAAA00000000000000000118 /* DeviceControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceControlView.swift; sourceTree = "<group>"; };
 		AAAA0000000000000000011A /* DeviceControlViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceControlViewModel.swift; sourceTree = "<group>"; };
 		AAAA0000000000000000011C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		AAAA0000000000000000011D /* GradientProgressStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GradientProgressStyle.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -89,6 +91,7 @@
 			children = (
 				AAAA00000000000000000104 /* Models.swift */,
 				AAAA00000000000000000106 /* MeshNetworkService.swift */,
+				AAAA0000000000000000011D /* GradientProgressStyle.swift */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -246,6 +249,7 @@
 				AAAA00000000000000000117 /* GroupConfigViewModel.swift in Sources */,
 				AAAA00000000000000000119 /* DeviceControlView.swift in Sources */,
 				AAAA0000000000000000011B /* DeviceControlViewModel.swift in Sources */,
+				AAAA0000000000000000011E /* GradientProgressStyle.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

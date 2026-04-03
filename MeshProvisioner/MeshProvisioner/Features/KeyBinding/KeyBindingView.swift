@@ -72,11 +72,10 @@ struct KeyBindingView: View {
                             .foregroundStyle(.secondary)
                     }
                     ProgressView(value: vm.progress)
-                        .tint(
-                            LinearGradient(colors: [.orange, .yellow],
-                                           startPoint: .leading, endPoint: .trailing)
-                        )
-                        .scaleEffect(x: 1, y: 1.5)
+                        .progressViewStyle(GradientProgressStyle(
+                            gradient: LinearGradient(colors: [.orange, .yellow],
+                                                     startPoint: .leading, endPoint: .trailing)
+                        ))
                         .accessibilityLabel("Configuration progress")
                         .accessibilityValue({
                             let completed = KeyBindingStep.allCases.filter {

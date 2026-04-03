@@ -60,6 +60,7 @@ struct GroupConfigView: View {
             .padding(.horizontal, 24)
             .padding(.bottom, 40)
         }
+        .scrollDismissesKeyboard(.interactively)
         .sensoryFeedback(.error, trigger: vm.errorMessage)
         .alert("Group Configuration Failed", isPresented: Binding(
             get: { vm.errorMessage != nil },
@@ -192,11 +193,10 @@ struct GroupConfigView: View {
                         .monospacedDigit()
                 }
                 ProgressView(value: vm.configProgress)
-                    .tint(
-                        LinearGradient(colors: [.green, .teal],
-                                       startPoint: .leading, endPoint: .trailing)
-                    )
-                    .scaleEffect(x: 1, y: 1.5)
+                    .progressViewStyle(GradientProgressStyle(
+                        gradient: LinearGradient(colors: [.green, .teal],
+                                                 startPoint: .leading, endPoint: .trailing)
+                    ))
                     .accessibilityLabel("Setup progress")
                     .accessibilityValue({
                         let completed = vm.nodeGroupConfigStates.filter { $0.state == .completed }.count

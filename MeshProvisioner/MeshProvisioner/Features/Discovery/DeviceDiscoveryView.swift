@@ -97,10 +97,21 @@ struct DeviceDiscoveryView: View {
 
     private func deviceList(vm: DeviceDiscoveryViewModel) -> some View {
         VStack(spacing: 16) {
-            HStack {
-                Text("Found \(vm.discoveredDevices.count) device\(vm.discoveredDevices.count == 1 ? "" : "s")")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Found \(vm.discoveredDevices.count) device\(vm.discoveredDevices.count == 1 ? "" : "s")")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                    if vm.selectedDevices.count == vm.discoveredDevices.count && !vm.discoveredDevices.isEmpty {
+                        Text("All selected")
+                            .font(.caption)
+                            .foregroundStyle(.blue)
+                    } else {
+                        Text("New devices are selected automatically")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 Spacer()
                 ProgressView()
                     .scaleEffect(0.8)
