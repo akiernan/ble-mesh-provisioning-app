@@ -17,8 +17,6 @@ final class DeviceDiscoveryViewModel {
     var discoveredDevices: [DiscoveredDevice] { meshService.discoveredDevices }
     var isScanning: Bool { meshService.isScanning }
     var bluetoothReady: Bool { meshService.bluetoothState == .poweredOn }
-    var selectedCount: Int { selectedIDs.count }
-
     var selectedDevices: [DiscoveredDevice] {
         meshService.discoveredDevices.filter { selectedIDs.contains($0.id) }
     }

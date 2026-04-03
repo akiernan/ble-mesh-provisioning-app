@@ -157,7 +157,6 @@ private struct ProvisioningDeviceRow: View {
     private var accessibilityDescription: String {
         switch state {
         case .pending:    return "\(device.name), waiting"
-        case .connecting: return "\(device.name), connecting"
         case .inProgress: return "\(device.name), provisioning, \(Int(currentDeviceProgressValue * 100)) percent"
         case .completed:  return "\(device.name), provisioned"
         case .failed(let msg): return "\(device.name), failed: \(msg)"
@@ -186,8 +185,6 @@ private struct ProvisioningDeviceRow: View {
             switch state {
             case .pending:
                 Text("Waiting").foregroundStyle(.secondary)
-            case .connecting:
-                Text("Connecting...").foregroundStyle(.purple)
             case .inProgress:
                 Text("Provisioning...").foregroundStyle(.purple)
             case .completed:
@@ -199,16 +196,10 @@ private struct ProvisioningDeviceRow: View {
         .font(.subheadline)
     }
 
-    private var isAnimating: Bool {
-        if case .inProgress = state { return true }
-        if case .connecting = state { return true }
-        return false
-    }
-
     private var iconName: String {
         switch state {
         case .pending: "network"
-        case .connecting, .inProgress: "arrow.triangle.2.circlepath"
+        case .inProgress: "arrow.triangle.2.circlepath"
         case .completed: "checkmark"
         case .failed: "xmark"
         }
@@ -217,7 +208,7 @@ private struct ProvisioningDeviceRow: View {
     private var iconBackground: Color {
         switch state {
         case .pending: Color(.systemGray3)
-        case .connecting, .inProgress: .purple
+        case .inProgress: .purple
         case .completed: .green
         case .failed: .red
         }
@@ -226,7 +217,7 @@ private struct ProvisioningDeviceRow: View {
     private var rowBackground: Color {
         switch state {
         case .completed: Color.green.opacity(0.06)
-        case .inProgress, .connecting: Color.purple.opacity(0.06)
+        case .inProgress: Color.purple.opacity(0.06)
         case .failed: Color.red.opacity(0.06)
         default: Color(.systemBackground)
         }
@@ -235,7 +226,7 @@ private struct ProvisioningDeviceRow: View {
     private var rowBorderColor: Color {
         switch state {
         case .completed: Color.green.opacity(0.4)
-        case .inProgress, .connecting: .purple
+        case .inProgress: .purple
         case .failed: Color.red.opacity(0.4)
         default: Color(.separator)
         }

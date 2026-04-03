@@ -303,7 +303,7 @@ final class MeshNetworkService: NSObject {
 
     private func provisionWithPeripheral(device: DiscoveredDevice,
                                           peripheral: CBPeripheral) async throws -> Node {
-        guard let network = manager.meshNetwork else { throw AppError.networkNotReady }
+        guard manager.meshNetwork != nil else { throw AppError.networkNotReady }
 
         let storedMeshData = discoveredPeripheralMeshData[device.peripheral.identifier]
         let unprovisionedDevice = UnprovisionedDevice(
@@ -311,8 +311,6 @@ final class MeshNetworkService: NSObject {
             uuid: device.id,
             oobInformation: oobInfo(from: storedMeshData)
         )
-
-        _ = network
 
         return try await withCheckedThrowingContinuation { continuation in
             let bearer = PBGattBearer(targetWithIdentifier: peripheral.identifier)

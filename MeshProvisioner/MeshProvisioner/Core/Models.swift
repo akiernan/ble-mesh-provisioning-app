@@ -37,14 +37,13 @@ struct DiscoveredDevice: Identifiable, Hashable {
 
 enum ProvisioningDeviceState: Equatable {
     case pending
-    case connecting
     case inProgress(progress: Double)
     case completed
     case failed(String)
 
     static func == (lhs: ProvisioningDeviceState, rhs: ProvisioningDeviceState) -> Bool {
         switch (lhs, rhs) {
-        case (.pending, .pending), (.connecting, .connecting), (.completed, .completed): true
+        case (.pending, .pending), (.completed, .completed): true
         case (.inProgress(let a), .inProgress(let b)): a == b
         case (.failed(let a), .failed(let b)): a == b
         default: false
