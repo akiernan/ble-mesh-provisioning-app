@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		AAAA00000000000000000011 /* NordicMesh in Frameworks */ = {isa = PBXBuildFile; productRef = AAAA00000000000000000010 /* NordicMesh */; };
+		AAAA00000000000000000120 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AAAA0000000000000000011F /* Localizable.xcstrings */; };
 		AAAA00000000000000000101 /* MeshProvisionerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000100 /* MeshProvisionerApp.swift */; };
 		AAAA00000000000000000103 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000102 /* AppRouter.swift */; };
 		AAAA00000000000000000105 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000104 /* Models.swift */; };
@@ -43,6 +44,7 @@
 		AAAA0000000000000000011A /* DeviceControlViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceControlViewModel.swift; sourceTree = "<group>"; };
 		AAAA0000000000000000011C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AAAA0000000000000000011D /* GradientProgressStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GradientProgressStyle.swift; sourceTree = "<group>"; };
+		AAAA0000000000000000011F /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -157,6 +159,7 @@
 			isa = PBXGroup;
 			children = (
 				AAAA0000000000000000011C /* Info.plist */,
+				AAAA0000000000000000011F /* Localizable.xcstrings */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -205,6 +208,7 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
+				"en-GB",
 				Base,
 			);
 			mainGroup = AAAA0000000000000000000C /* MeshProvisioner */;
@@ -225,6 +229,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AAAA00000000000000000120 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
