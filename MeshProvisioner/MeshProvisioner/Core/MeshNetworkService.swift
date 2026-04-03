@@ -620,6 +620,19 @@ final class MeshNetworkService: NSObject {
             return nil
         }
 
+        // Models to bind/subscribe on the local provisioner node.
+        let localServerIds: Set<UInt16> = [
+            .genericOnOffServerModelId,
+            .genericLevelServerModelId,
+            .genericDefaultTransitionTimeServerModelId,
+            .genericPowerOnOffServerModelId,
+            .genericPowerOnOffSetupServerModelId,
+            .lightLightnessServerModelId,
+            .lightLightnessSetupServerModelId,
+            .lightCTLServerModelId,
+            .lightCTLSetupServerModelId,
+        ]
+
         // Count total BLE operations upfront for progress reporting.
         var totalOps = 0
         for node in nodes {
@@ -634,13 +647,22 @@ final class MeshNetworkService: NSObject {
                 }
             }
         }
+        // Include local node operations in the total so progress doesn't pin at 100%
+        // before the local provisioner is configured.
+        let localNode = network.localProvisioner?.node
+        let localName = localNode?.name ?? "This Device"
+        if let localNode {
+            for element in localNode.elements {
+                for model in element.models where localServerIds.contains(model.modelIdentifier) {
+                    totalOps += 2 // ConfigModelAppBind + ConfigModelSubscriptionAdd
+                }
+            }
+        }
         totalOps = max(1, totalOps)
         var completedOps = 0
 
         groupConfigProgress = 0
         groupConfigStatus = "Starting…"
-        let localNode = network.localProvisioner?.node
-        let localName = localNode?.name ?? "This Device"
         var initialStates = nodes.enumerated().map { idx, node in
             NodeKeyBindingState(id: node.uuid, name: node.name ?? "Device \(idx + 1)", state: .pending)
         }
@@ -692,25 +714,18 @@ final class MeshNetworkService: NSObject {
             if let idx = nodeGroupConfigStates.firstIndex(where: { $0.id == localId }) {
                 nodeGroupConfigStates[idx].state = .inProgress
             }
-            let localServerIds: Set<UInt16> = [
-                .genericOnOffServerModelId,
-                .genericLevelServerModelId,
-                .genericDefaultTransitionTimeServerModelId,
-                .genericPowerOnOffServerModelId,
-                .genericPowerOnOffSetupServerModelId,
-                .lightLightnessServerModelId,
-                .lightLightnessSetupServerModelId,
-                .lightCTLServerModelId,
-                .lightCTLSetupServerModelId,
-            ]
             groupConfigStatus = "Configuring \(localName)…"
             for element in localNode.elements {
                 for model in element.models where localServerIds.contains(model.modelIdentifier) {
                     if let msg = ConfigModelAppBind(applicationKey: appKey, to: model) {
                         await sendConfig(msg, to: localNode)
+                        completedOps += 1
+                        groupConfigProgress = Double(completedOps) / Double(totalOps)
                     }
                     if let msg = ConfigModelSubscriptionAdd(group: group, to: model) {
                         await sendConfig(msg, to: localNode)
+                        completedOps += 1
+                        groupConfigProgress = Double(completedOps) / Double(totalOps)
                     }
                 }
             }
