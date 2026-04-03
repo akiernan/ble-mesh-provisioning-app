@@ -32,8 +32,8 @@ struct DeviceControlView: View {
                 resetProgressOverlay(vm: vm)
             }
         }
-        .alert("Reset Mesh Network?", isPresented: $showResetConfirm) {
-            Button("Reset", role: .destructive) {
+        .confirmationDialog("Reset Mesh Network?", isPresented: $showResetConfirm, titleVisibility: .visible) {
+            Button("Reset All Devices", role: .destructive) {
                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                 viewModel?.restart()
             }
@@ -239,25 +239,38 @@ struct DeviceControlView: View {
         .frame(height: 32)
     }
 
+    /// Full CCT ramp covering 800–20000 K. startPoint/endPoint are computed
+    /// so only the device's supported temperature range is visible in the track.
+    private func cctGradient(for group: MeshGroupConfig) -> LinearGradient {
+        let fullMin = 800.0, fullMax = 20000.0
+        let normMin = (Double(group.temperatureRangeMin) - fullMin) / (fullMax - fullMin)
+        let normMax = (Double(group.temperatureRangeMax) - fullMin) / (fullMax - fullMin)
+        let span = max(normMax - normMin, 0.001)
+        // Offset startPoint/endPoint so the gradient is "zoomed in" to [normMin, normMax]
+        let startX = -normMin / span
+        let endX   = (1 - normMin) / span
+        return LinearGradient(
+            stops: [
+                .init(color: Color(red: 1.0, green: 0.55, blue: 0.26), location: 0),
+                .init(color: Color(red: 1.0, green: 0.85, blue: 0.0),  location: 0.2),
+                .init(color: Color(white: 0.88),                        location: 0.5),
+                .init(color: Color(red: 0.7,  green: 0.85, blue: 1.0), location: 0.75),
+                .init(color: Color(red: 0.29, green: 0.56, blue: 0.89), location: 1.0)
+            ],
+            startPoint: UnitPoint(x: startX, y: 0.5),
+            endPoint:   UnitPoint(x: endX,   y: 0.5)
+        )
+    }
+
     private func temperatureSlider(vm: DeviceControlViewModel, group: MeshGroupConfig) -> some View {
         let minTemp = Double(group.temperatureRangeMin)
         let maxTemp = Double(group.temperatureRangeMax)
         let thumbDiameter: CGFloat = 28
         let thumbRadius = thumbDiameter / 2
         return ZStack {
-            // Gradient track
+            // Gradient track — sliced to device's discovered CCT range
             RoundedRectangle(cornerRadius: 4)
-                .fill(LinearGradient(
-                    stops: [
-                        .init(color: Color(red: 1.0, green: 0.55, blue: 0.26), location: 0),
-                        .init(color: Color(red: 1.0, green: 0.85, blue: 0.0), location: 0.2),
-                        .init(color: Color(white: 0.88), location: 0.5),
-                        .init(color: Color(red: 0.7, green: 0.85, blue: 1.0), location: 0.75),
-                        .init(color: Color(red: 0.29, green: 0.56, blue: 0.89), location: 1.0)
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                ))
+                .fill(cctGradient(for: group))
                 .frame(height: 12)
                 .padding(.horizontal, 12)
             Slider(
@@ -314,9 +327,9 @@ struct DeviceControlView: View {
                 VStack(spacing: 8) {
                     ForEach(Array(vm.deviceNames.enumerated()), id: \.0) { _, name in
                         HStack(spacing: 12) {
-                            Circle()
-                                .fill(vm.group?.isOn == true ? Color.green : Color(.systemGray3))
-                                .frame(width: 10, height: 10)
+                            Image(systemName: vm.group?.isOn == true ? "circle.fill" : "circle")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(vm.group?.isOn == true ? Color.green : Color(.systemGray3))
                                 .accessibilityHidden(true)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(name).font(.subheadline).fontWeight(.medium)
@@ -394,9 +407,16 @@ struct DeviceControlView: View {
                     .foregroundStyle(.white)
             }
             VStack(alignment: .leading, spacing: 4) {
-                Text("Mesh Network \(vm.isConnected ? "Active" : "Connecting...")")
-                    .font(.headline)
-                    .foregroundStyle(.blue)
+                HStack(spacing: 8) {
+                    Text(vm.isConnected ? "Mesh Network Active" : "Connecting…")
+                        .font(.headline)
+                        .foregroundStyle(.blue)
+                    if !vm.isConnected {
+                        ProgressView()
+                            .tint(.blue)
+                            .scaleEffect(0.75)
+                    }
+                }
                 Text("All devices in this group are connected via BLE mesh. Changes are broadcast to all devices simultaneously for synchronized control.")
                     .font(.caption)
                     .foregroundStyle(.secondary)

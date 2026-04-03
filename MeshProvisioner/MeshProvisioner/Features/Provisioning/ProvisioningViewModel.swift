@@ -11,6 +11,7 @@ final class ProvisioningViewModel {
     var currentIndex = 0
     var completedCount = 0
     var errorMessage: String?
+    private var provisioningTask: Task<Void, Never>?
 
     init(meshService: MeshNetworkService, router: AppRouter) {
         self.meshService = meshService
@@ -40,7 +41,13 @@ final class ProvisioningViewModel {
     func startProvisioning() {
         guard !isRunning else { return }
         isRunning = true
-        Task { await runProvisioning() }
+        provisioningTask = Task { await runProvisioning() }
+    }
+
+    func cancelAndReturn() {
+        provisioningTask?.cancel()
+        provisioningTask = nil
+        router.popToRoot()
     }
 
     private func runProvisioning() async {

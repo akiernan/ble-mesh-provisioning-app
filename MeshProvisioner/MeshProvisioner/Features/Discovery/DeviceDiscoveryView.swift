@@ -25,47 +25,46 @@ struct DeviceDiscoveryView: View {
 
     @ViewBuilder
     private func content(vm: DeviceDiscoveryViewModel) -> some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(spacing: 32) {
-                    // Header
-                    VStack(spacing: 12) {
-                        ZStack {
-                            Circle()
-                                .fill(LinearGradient(
-                                    colors: [.blue, .cyan],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ))
-                                .frame(width: 80, height: 80)
-                            Image(systemName: "wave.3.right")
-                                .font(.system(size: 32, weight: .medium))
-                                .foregroundStyle(.white)
-                        }
-                        Text("Discover Devices")
-                            .font(.largeTitle.bold())
-                        Text("Scan for nearby BLE mesh devices to add to your network")
-                            .font(.body)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
+        ScrollView {
+            VStack(spacing: 32) {
+                // Header
+                VStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(LinearGradient(
+                                colors: [.blue, .cyan],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ))
+                            .frame(width: 80, height: 80)
+                        Image(systemName: "wave.3.right")
+                            .font(.system(size: 32, weight: .medium))
+                            .foregroundStyle(.white)
                     }
-                    .padding(.top, 32)
-
-                    if !vm.bluetoothReady {
-                        bluetoothUnavailableView
-                    } else if !vm.isScanning && vm.discoveredDevices.isEmpty {
-                        scanButton(vm: vm)
-                    } else {
-                        deviceList(vm: vm)
-                    }
+                    Text("Discover Devices")
+                        .font(.largeTitle.bold())
+                    Text("Scan for nearby BLE mesh devices to add to your network")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
                 }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 120)
-            }
-            .onChange(of: vm.discoveredDevices.count) {
-                vm.autoSelectNewDevices()
-            }
+                .padding(.top, 32)
 
+                if !vm.bluetoothReady {
+                    bluetoothUnavailableView
+                } else if !vm.isScanning && vm.discoveredDevices.isEmpty {
+                    scanButton(vm: vm)
+                } else {
+                    deviceList(vm: vm)
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 24)
+        }
+        .onChange(of: vm.discoveredDevices.count) {
+            vm.autoSelectNewDevices()
+        }
+        .safeAreaInset(edge: .bottom) {
             footer(vm: vm)
         }
     }

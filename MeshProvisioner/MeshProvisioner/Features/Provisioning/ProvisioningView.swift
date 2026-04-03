@@ -23,6 +23,13 @@ struct ProvisioningView: View {
         .navigationBarBackButtonHidden(viewModel?.isRunning ?? true)
         .navigationTitle("Provisioning")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if viewModel?.isRunning == true {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { viewModel?.cancelAndReturn() }
+                }
+            }
+        }
     }
 
     private func content(vm: ProvisioningViewModel) -> some View {

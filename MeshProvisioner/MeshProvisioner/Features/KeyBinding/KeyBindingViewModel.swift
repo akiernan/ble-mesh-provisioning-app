@@ -9,6 +9,7 @@ final class KeyBindingViewModel {
 
     var isRunning = false
     var errorMessage: String?
+    private var keyBindingTask: Task<Void, Never>?
 
     init(meshService: MeshNetworkService, router: AppRouter) {
         self.meshService = meshService
@@ -38,7 +39,13 @@ final class KeyBindingViewModel {
     func startKeyBinding() {
         guard !isRunning else { return }
         isRunning = true
-        Task { await runKeyBinding() }
+        keyBindingTask = Task { await runKeyBinding() }
+    }
+
+    func cancelAndReturn() {
+        keyBindingTask?.cancel()
+        keyBindingTask = nil
+        router.popToRoot()
     }
 
     private func runKeyBinding() async {

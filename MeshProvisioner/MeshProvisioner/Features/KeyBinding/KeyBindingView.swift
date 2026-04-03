@@ -23,6 +23,13 @@ struct KeyBindingView: View {
         .navigationBarBackButtonHidden(viewModel?.isRunning ?? true)
         .navigationTitle("Key Binding")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if viewModel?.isRunning == true {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { viewModel?.cancelAndReturn() }
+                }
+            }
+        }
     }
 
     private func content(vm: KeyBindingViewModel) -> some View {
