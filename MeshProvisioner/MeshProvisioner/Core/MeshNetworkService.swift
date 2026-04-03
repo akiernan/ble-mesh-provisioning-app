@@ -108,10 +108,8 @@ final class MeshNetworkService: NSObject {
                 // Client models for sending commands and receiving acknowledged responses.
                 Model(sigModelId: .genericOnOffClientModelId, delegate: clientDelegate),
                 Model(sigModelId: .lightCTLClientModelId, delegate: clientDelegate),
-                // All server models that bind transitively to the Light CTL Server.
-                // Subscribing these to the group causes the proxy filter to forward
-                // group-addressed messages to us, enabling real-time state updates
-                // from the external dimmer and switch.
+                // Server models subscribed to the main group (0xC001) so the proxy
+                // filter forwards lightness / on-off commands from the external dimmer.
                 Model(sigModelId: .genericOnOffServerModelId, delegate: serverDelegate),
                 Model(sigModelId: .genericLevelServerModelId, delegate: serverDelegate),
                 Model(sigModelId: .genericDefaultTransitionTimeServerModelId, delegate: serverDelegate),
@@ -121,7 +119,14 @@ final class MeshNetworkService: NSObject {
                 Model(sigModelId: .lightLightnessSetupServerModelId, delegate: serverDelegate),
                 Model(sigModelId: .lightCTLServerModelId, delegate: serverDelegate),
                 Model(sigModelId: .lightCTLSetupServerModelId, delegate: serverDelegate),
-            ])
+            ]),
+            // CTL temperature element – mirrors the secondary element on lighting nodes.
+            // Subscribed to 0xC002 so Generic Level messages from the Silvair switch's
+            // second controller reach us and are interpreted as colour-temperature changes.
+            Element(name: "CTL Temperature Element", location: .unknown, models: [
+                Model(sigModelId: .genericLevelServerModelId, delegate: serverDelegate),
+                Model(sigModelId: .genericDefaultTransitionTimeServerModelId, delegate: serverDelegate),
+            ]),
         ]
         // Use a reject list with no rejected addresses (= accept everything) so that
         // group-addressed messages are always forwarded by the GATT proxy, regardless
@@ -552,14 +557,29 @@ final class MeshNetworkService: NSObject {
             try await connectToProxy()
         }
 
-        let groupAddress: Address = 0xC001
-        let group: Group
-        if let existing = network.group(withAddress: MeshAddress(groupAddress)) {
-            group = existing
+        // Main lighting group: OnOff / Level / Lightness / CTL commands
+        let mainGroupAddress: Address = 0xC001
+        let mainGroup: Group
+        if let existing = network.group(withAddress: MeshAddress(mainGroupAddress)) {
+            mainGroup = existing
         } else {
             do {
-                group = try Group(name: name, address: MeshAddress(groupAddress))
-                try network.add(group: group)
+                mainGroup = try Group(name: name, address: MeshAddress(mainGroupAddress))
+                try network.add(group: mainGroup)
+            } catch {
+                throw AppError.groupConfigFailed(error.localizedDescription)
+            }
+        }
+
+        // CTL temperature group: Generic Level commands from the Silvair switch's second controller
+        let ctlTempGroupAddress: Address = 0xC002
+        let ctlTempGroup: Group
+        if let existing = network.group(withAddress: MeshAddress(ctlTempGroupAddress)) {
+            ctlTempGroup = existing
+        } else {
+            do {
+                ctlTempGroup = try Group(name: "\(name) CTL Temperature", address: MeshAddress(ctlTempGroupAddress))
+                try network.add(group: ctlTempGroup)
             } catch {
                 throw AppError.groupConfigFailed(error.localizedDescription)
             }
@@ -592,15 +612,24 @@ final class MeshNetworkService: NSObject {
         ]
 
         // Silvair vendor model (CID 0x0136, ModelID 0x0001) identifies a switch element.
-        // OnOff Client and Level Client in that element should publish to the group.
         let silvairVendorModelId: UInt32 = (UInt32(0x0136) << 16) | UInt32(0x0001)
+        // OnOff + Level clients in the Silvair element publish to the main lighting group.
         let switchClientIds: Set<UInt16> = [
             .genericOnOffClientModelId, // 0x1001
             .genericLevelClientModelId, // 0x1003
         ]
-
-        let switchPublication = Publish(
-            to: MeshAddress(groupAddress),
+        let mainSwitchPublication = Publish(
+            to: MeshAddress(mainGroupAddress),
+            using: appKey,
+            usingFriendshipMaterial: false,
+            ttl: 5,
+            period: .disabled,
+            retransmit: .disabled
+        )
+        // The Level Client in the element immediately after the Silvair element publishes
+        // to the CTL temperature group so the second controller controls colour temperature.
+        let ctlTempPublication = Publish(
+            to: MeshAddress(ctlTempGroupAddress),
             using: appKey,
             usingFriendshipMaterial: false,
             ttl: 5,
@@ -608,19 +637,19 @@ final class MeshNetworkService: NSObject {
             retransmit: .disabled
         )
 
-        // Helper: returns the subscription ID set appropriate for an element, or nil if
-        // the element doesn't contain any of our target lighting servers.
-        func subscribeIds(for element: Element) -> Set<UInt16>? {
+        // Helper: which models should subscribe, and to which group.
+        // Primary lighting element → main group; CTL temp element → CTL temp group.
+        func subscribeTarget(for element: Element) -> (ids: Set<UInt16>, group: Group)? {
             let ids = Set(element.models.map { $0.modelIdentifier })
             if ids.contains(.lightCTLServerModelId) || ids.contains(.lightLightnessServerModelId) {
-                return ctlLightnessBindingIds
+                return (ctlLightnessBindingIds, mainGroup)
             } else if ids.contains(.lightCTLTemperatureServerModelId) {
-                return ctlTempBindingIds
+                return (ctlTempBindingIds, ctlTempGroup)
             }
             return nil
         }
 
-        // Models to bind/subscribe on the local provisioner node.
+        // Models for local provisioner element 0 → bound and subscribed to main group (0xC001).
         let localServerIds: Set<UInt16> = [
             .genericOnOffServerModelId,
             .genericLevelServerModelId,
@@ -632,28 +661,46 @@ final class MeshNetworkService: NSObject {
             .lightCTLServerModelId,
             .lightCTLSetupServerModelId,
         ]
+        // Models for local provisioner element 1 → bound and subscribed to CTL temp group (0xC002).
+        let localCTLTempServerIds: Set<UInt16> = [
+            .genericLevelServerModelId,
+            .genericDefaultTransitionTimeServerModelId,
+        ]
 
         // Count total BLE operations upfront for progress reporting.
         var totalOps = 0
         for node in nodes {
-            for element in node.elements {
-                let subIds = subscribeIds(for: element)
+            let elements = Array(node.elements)
+            for (elementIndex, element) in elements.enumerated() {
+                let target = subscribeTarget(for: element)
                 let hasSilvair = element.models.contains(where: { $0.modelId == silvairVendorModelId })
                 for model in element.models {
-                    if subIds?.contains(model.modelIdentifier) == true,
-                       ConfigModelSubscriptionAdd(group: group, to: model) != nil { totalOps += 1 }
+                    if let t = target, t.ids.contains(model.modelIdentifier),
+                       ConfigModelSubscriptionAdd(group: t.group, to: model) != nil { totalOps += 1 }
                     if hasSilvair && switchClientIds.contains(model.modelIdentifier),
-                       ConfigModelPublicationSet(switchPublication, to: model) != nil { totalOps += 1 }
+                       ConfigModelPublicationSet(mainSwitchPublication, to: model) != nil { totalOps += 1 }
+                }
+                // Level Client in element+1 after the Silvair element → CTL temp group
+                if hasSilvair && elementIndex + 1 < elements.count {
+                    let nextEl = elements[elementIndex + 1]
+                    for model in nextEl.models where model.modelIdentifier == .genericLevelClientModelId {
+                        if ConfigModelPublicationSet(ctlTempPublication, to: model) != nil { totalOps += 1 }
+                    }
                 }
             }
         }
-        // Include local node operations in the total so progress doesn't pin at 100%
-        // before the local provisioner is configured.
+        // Include local provisioner ops: element 0 → main group, element 1 → CTL temp group.
         let localNode = network.localProvisioner?.node
         let localName = localNode?.name ?? "This Device"
         if let localNode {
-            for element in localNode.elements {
-                for model in element.models where localServerIds.contains(model.modelIdentifier) {
+            let localElements = Array(localNode.elements)
+            if !localElements.isEmpty {
+                for model in localElements[0].models where localServerIds.contains(model.modelIdentifier) {
+                    totalOps += 2 // ConfigModelAppBind + ConfigModelSubscriptionAdd
+                }
+            }
+            if localElements.count > 1 {
+                for model in localElements[1].models where localCTLTempServerIds.contains(model.modelIdentifier) {
                     totalOps += 2 // ConfigModelAppBind + ConfigModelSubscriptionAdd
                 }
             }
@@ -676,23 +723,24 @@ final class MeshNetworkService: NSObject {
             if let idx = nodeGroupConfigStates.firstIndex(where: { $0.id == node.uuid }) {
                 nodeGroupConfigStates[idx].state = .inProgress
             }
-            for element in node.elements {
-                let subIds = subscribeIds(for: element)
+            let elements = Array(node.elements)
+            for (elementIndex, element) in elements.enumerated() {
+                let target = subscribeTarget(for: element)
                 let hasSilvair = element.models.contains(where: { $0.modelId == silvairVendorModelId })
                 for model in element.models {
-                    // Subscribe lighting models to the group
-                    if subIds?.contains(model.modelIdentifier) == true,
-                       let msg = ConfigModelSubscriptionAdd(group: group, to: model) {
+                    // Subscribe lighting models to the appropriate group
+                    if let t = target, t.ids.contains(model.modelIdentifier),
+                       let msg = ConfigModelSubscriptionAdd(group: t.group, to: model) {
                         groupConfigStatus = "Subscribing \(nodeName) to group…"
-                        logger.info("🔧 Subscribing model 0x\(String(model.modelId, radix: 16)) to group \(name)")
+                        logger.info("🔧 Subscribing model 0x\(String(model.modelId, radix: 16)) to \(t.group.name)")
                         await sendConfig(msg, to: node)
                         try? await Task.sleep(for: .milliseconds(200))
                         completedOps += 1
                         groupConfigProgress = Double(completedOps) / Double(totalOps)
                     }
-                    // Configure switch clients (Silvair element) to publish to the group
+                    // Silvair main controller: OnOff + Level publish to main group
                     if hasSilvair && switchClientIds.contains(model.modelIdentifier),
-                       let msg = ConfigModelPublicationSet(switchPublication, to: model) {
+                       let msg = ConfigModelPublicationSet(mainSwitchPublication, to: model) {
                         groupConfigStatus = "Configuring switch publish on \(nodeName)…"
                         logger.info("🔧 Configuring switch client 0x\(String(model.modelId, radix: 16)) → 0xC001")
                         await sendConfig(msg, to: node)
@@ -701,28 +749,57 @@ final class MeshNetworkService: NSObject {
                         groupConfigProgress = Double(completedOps) / Double(totalOps)
                     }
                 }
+                // Silvair element+1: Level Client publishes to CTL temp group (OnOff ignored)
+                if hasSilvair && elementIndex + 1 < elements.count {
+                    let nextEl = elements[elementIndex + 1]
+                    for model in nextEl.models where model.modelIdentifier == .genericLevelClientModelId {
+                        if let msg = ConfigModelPublicationSet(ctlTempPublication, to: model) {
+                            groupConfigStatus = "Configuring CTL temp switch on \(nodeName)…"
+                            logger.info("🔧 Configuring CTL switch client 0x\(String(model.modelId, radix: 16)) → 0xC002")
+                            await sendConfig(msg, to: node)
+                            try? await Task.sleep(for: .milliseconds(200))
+                            completedOps += 1
+                            groupConfigProgress = Double(completedOps) / Double(totalOps)
+                        }
+                    }
+                }
             }
             if let idx = nodeGroupConfigStates.firstIndex(where: { $0.id == node.uuid }) {
                 nodeGroupConfigStates[idx].state = .completed
             }
         }
 
-        // Bind app key and subscribe local server models to the group so this device
-        // receives state updates (e.g. from the external switch) addressed to the group.
+        // Bind app key and subscribe local provisioner models.
+        // Element 0 (lighting servers) → main group; element 1 (CTL temp level) → CTL temp group.
         if let localNode {
             let localId = localNode.uuid
             if let idx = nodeGroupConfigStates.firstIndex(where: { $0.id == localId }) {
                 nodeGroupConfigStates[idx].state = .inProgress
             }
             groupConfigStatus = "Configuring \(localName)…"
-            for element in localNode.elements {
-                for model in element.models where localServerIds.contains(model.modelIdentifier) {
+            let localElements = Array(localNode.elements)
+            if !localElements.isEmpty {
+                for model in localElements[0].models where localServerIds.contains(model.modelIdentifier) {
                     if let msg = ConfigModelAppBind(applicationKey: appKey, to: model) {
                         await sendConfig(msg, to: localNode)
                         completedOps += 1
                         groupConfigProgress = Double(completedOps) / Double(totalOps)
                     }
-                    if let msg = ConfigModelSubscriptionAdd(group: group, to: model) {
+                    if let msg = ConfigModelSubscriptionAdd(group: mainGroup, to: model) {
+                        await sendConfig(msg, to: localNode)
+                        completedOps += 1
+                        groupConfigProgress = Double(completedOps) / Double(totalOps)
+                    }
+                }
+            }
+            if localElements.count > 1 {
+                for model in localElements[1].models where localCTLTempServerIds.contains(model.modelIdentifier) {
+                    if let msg = ConfigModelAppBind(applicationKey: appKey, to: model) {
+                        await sendConfig(msg, to: localNode)
+                        completedOps += 1
+                        groupConfigProgress = Double(completedOps) / Double(totalOps)
+                    }
+                    if let msg = ConfigModelSubscriptionAdd(group: ctlTempGroup, to: model) {
                         await sendConfig(msg, to: localNode)
                         completedOps += 1
                         groupConfigProgress = Double(completedOps) / Double(totalOps)
@@ -742,7 +819,7 @@ final class MeshNetworkService: NSObject {
         let config = MeshGroupConfig(
             id: UUID().uuidString,
             name: name,
-            groupAddress: groupAddress,
+            groupAddress: mainGroupAddress,
             nodeUnicastAddresses: nodes.map { $0.primaryUnicastAddress },
             isOn: false,
             lightness: 0.5,
@@ -1149,30 +1226,65 @@ extension MeshNetworkService: MeshNetworkDelegate {
                 self.currentGroup?.isOn = status.isOn
 
             case let cmd as GenericLevelSet:
-                let lightnessRaw = UInt16(Int32(cmd.level) + 32768)
-                let lightness = Double(lightnessRaw) / 65535.0
-                logger.info("🔄 Level command received: \(cmd.level) → lightness=\(Int(lightness * 100))%")
-                self.currentGroup?.lightness = lightness
-                if lightnessRaw == 0 { self.currentGroup?.isOn = false }
-                else if self.currentGroup?.isOn == false { self.currentGroup?.isOn = true }
+                if destination.address == 0xC002 {
+                    // Second Silvair controller → colour temperature
+                    let tMin = self.currentGroup?.temperatureRangeMin ?? MeshGroupConfig.temperatureMin
+                    let tMax = self.currentGroup?.temperatureRangeMax ?? MeshGroupConfig.temperatureMax
+                    let normalized = (Double(cmd.level) + 32768.0) / 65535.0
+                    let temp = tMin + UInt16(normalized * Double(tMax - tMin))
+                    logger.info("🌡️ CTL level command (second controller): \(cmd.level) → \(temp)K")
+                    self.currentGroup?.temperature = temp
+                } else {
+                    let lightnessRaw = UInt16(Int32(cmd.level) + 32768)
+                    let lightness = Double(lightnessRaw) / 65535.0
+                    logger.info("🔄 Level command received: \(cmd.level) → lightness=\(Int(lightness * 100))%")
+                    self.currentGroup?.lightness = lightness
+                    if lightnessRaw == 0 { self.currentGroup?.isOn = false }
+                    else if self.currentGroup?.isOn == false { self.currentGroup?.isOn = true }
+                }
 
             case let cmd as GenericLevelSetUnacknowledged:
-                let lightnessRaw = UInt16(Int32(cmd.level) + 32768)
-                let lightness = Double(lightnessRaw) / 65535.0
-                logger.info("🔄 Level command received: \(cmd.level) → lightness=\(Int(lightness * 100))%")
-                self.currentGroup?.lightness = lightness
-                if lightnessRaw == 0 { self.currentGroup?.isOn = false }
-                else if self.currentGroup?.isOn == false { self.currentGroup?.isOn = true }
+                if destination.address == 0xC002 {
+                    let tMin = self.currentGroup?.temperatureRangeMin ?? MeshGroupConfig.temperatureMin
+                    let tMax = self.currentGroup?.temperatureRangeMax ?? MeshGroupConfig.temperatureMax
+                    let normalized = (Double(cmd.level) + 32768.0) / 65535.0
+                    let temp = tMin + UInt16(normalized * Double(tMax - tMin))
+                    logger.info("🌡️ CTL level command (second controller): \(cmd.level) → \(temp)K")
+                    self.currentGroup?.temperature = temp
+                } else {
+                    let lightnessRaw = UInt16(Int32(cmd.level) + 32768)
+                    let lightness = Double(lightnessRaw) / 65535.0
+                    logger.info("🔄 Level command received: \(cmd.level) → lightness=\(Int(lightness * 100))%")
+                    self.currentGroup?.lightness = lightness
+                    if lightnessRaw == 0 { self.currentGroup?.isOn = false }
+                    else if self.currentGroup?.isOn == false { self.currentGroup?.isOn = true }
+                }
 
             case let cmd as GenericDeltaSetUnacknowledged:
-                let currentLevel = Int32((self.currentGroup?.lightness ?? 0.5) * 65535) - 32768
-                let newLevel = max(-32768, min(32767, currentLevel + cmd.delta))
-                let lightnessRaw = UInt16(newLevel + 32768)
-                let lightness = Double(lightnessRaw) / 65535.0
-                logger.info("🔄 Delta command received: Δ\(cmd.delta) → level=\(newLevel), lightness=\(Int(lightness * 100))%")
-                self.currentGroup?.lightness = lightness
-                if lightnessRaw == 0 { self.currentGroup?.isOn = false }
-                else if self.currentGroup?.isOn == false { self.currentGroup?.isOn = true }
+                if destination.address == 0xC002 {
+                    // Delta from second Silvair controller → colour temperature change
+                    let tMin = self.currentGroup?.temperatureRangeMin ?? MeshGroupConfig.temperatureMin
+                    let tMax = self.currentGroup?.temperatureRangeMax ?? MeshGroupConfig.temperatureMax
+                    let currentTemp = self.currentGroup?.temperature ?? UInt16((Double(tMin) + Double(tMax)) / 2.0)
+                    let tempFraction = tMax > tMin
+                        ? max(0.0, min(1.0, Double(Int(currentTemp) - Int(tMin)) / Double(Int(tMax) - Int(tMin))))
+                        : 0.5
+                    let currentLevel = Int32(tempFraction * 65535.0) - 32768
+                    let newLevel = max(-32768, min(32767, currentLevel + cmd.delta))
+                    let newFraction = (Double(newLevel) + 32768.0) / 65535.0
+                    let temp = tMin + UInt16(newFraction * Double(tMax - tMin))
+                    logger.info("🌡️ CTL delta command (second controller): Δ\(cmd.delta) → \(temp)K")
+                    self.currentGroup?.temperature = temp
+                } else {
+                    let currentLevel = Int32((self.currentGroup?.lightness ?? 0.5) * 65535) - 32768
+                    let newLevel = max(-32768, min(32767, currentLevel + cmd.delta))
+                    let lightnessRaw = UInt16(newLevel + 32768)
+                    let lightness = Double(lightnessRaw) / 65535.0
+                    logger.info("🔄 Delta command received: Δ\(cmd.delta) → level=\(newLevel), lightness=\(Int(lightness * 100))%")
+                    self.currentGroup?.lightness = lightness
+                    if lightnessRaw == 0 { self.currentGroup?.isOn = false }
+                    else if self.currentGroup?.isOn == false { self.currentGroup?.isOn = true }
+                }
 
             case let status as GenericLevelStatus:
                 let lightnessRaw = UInt16(Int32(status.level) + 32768)
