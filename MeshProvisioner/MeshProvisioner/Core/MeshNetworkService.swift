@@ -112,9 +112,6 @@ final class MeshNetworkService: NSObject {
                 // filter forwards lightness / on-off commands from the external dimmer.
                 Model(sigModelId: .genericOnOffServerModelId, delegate: serverDelegate),
                 Model(sigModelId: .genericLevelServerModelId, delegate: serverDelegate),
-                Model(sigModelId: .genericDefaultTransitionTimeServerModelId, delegate: serverDelegate),
-                Model(sigModelId: .genericPowerOnOffServerModelId, delegate: serverDelegate),
-                Model(sigModelId: .genericPowerOnOffSetupServerModelId, delegate: serverDelegate),
                 Model(sigModelId: .lightLightnessServerModelId, delegate: serverDelegate),
                 Model(sigModelId: .lightLightnessSetupServerModelId, delegate: serverDelegate),
                 Model(sigModelId: .lightCTLServerModelId, delegate: serverDelegate),
@@ -125,7 +122,7 @@ final class MeshNetworkService: NSObject {
             // second controller reach us and are interpreted as colour-temperature changes.
             Element(name: "CTL Temperature Element", location: .unknown, models: [
                 Model(sigModelId: .genericLevelServerModelId, delegate: serverDelegate),
-                Model(sigModelId: .genericDefaultTransitionTimeServerModelId, delegate: serverDelegate),
+                Model(sigModelId: .lightCTLTemperatureServerModelId, delegate: serverDelegate),
             ]),
         ]
         // Use a reject list with no rejected addresses (= accept everything) so that
@@ -643,9 +640,6 @@ final class MeshNetworkService: NSObject {
         let localServerIds: Set<UInt16> = [
             .genericOnOffServerModelId,
             .genericLevelServerModelId,
-            .genericDefaultTransitionTimeServerModelId,
-            .genericPowerOnOffServerModelId,
-            .genericPowerOnOffSetupServerModelId,
             .lightLightnessServerModelId,
             .lightLightnessSetupServerModelId,
             .lightCTLServerModelId,
@@ -654,7 +648,7 @@ final class MeshNetworkService: NSObject {
         // Models for local provisioner element 1 → bound and subscribed to CTL temp group (0xC002).
         let localCTLTempServerIds: Set<UInt16> = [
             .genericLevelServerModelId,
-            .genericDefaultTransitionTimeServerModelId,
+            .lightCTLTemperatureServerModelId,
         ]
 
         // Count total BLE operations upfront for progress reporting.
