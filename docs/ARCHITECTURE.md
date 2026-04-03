@@ -23,7 +23,8 @@ MeshProvisioner/
 │   └── AppRouter.swift              # @Observable NavigationPath wrapper
 ├── Core/
 │   ├── MeshNetworkService.swift     # All BLE/mesh logic (single service class)
-│   └── Models.swift                 # Value types: DiscoveredDevice, MeshGroupConfig, enums
+│   ├── Models.swift                 # Value types: DiscoveredDevice, MeshGroupConfig, enums
+│   └── GradientProgressStyle.swift  # Custom ProgressViewStyle with gradient fill and fixed height
 └── Features/
     ├── Discovery/
     │   ├── DeviceDiscoveryView.swift
@@ -82,24 +83,31 @@ The central service class. `@Observable @MainActor`. Owns all BLE and mesh state
 
 ### Local Node Element Structure
 
-The iPhone presents itself as a mesh node with one Primary Element containing 11 models:
+The iPhone presents itself as a mesh node with two elements:
 
 ```
-Primary Element
+Element 0 — Primary Element
 ├── GenericOnOffClient       (0x1001) — sends GenericOnOffSet to group
 ├── LightCTLClient           (0x1305) — sends LightCTLSet to group; receives status
 ├── GenericOnOffServer       (0x1000) ─┐
 ├── GenericLevelServer       (0x1002)  │
-├── GenericDefaultTTServer   (0x1004)  │ All subscribed to 0xC001 during group config.
-├── GenericPowerOnOffServer  (0x1006)  │ Enables receipt of group-addressed commands
+├── GenericDefaultTTServer   (0x1004)  │ Subscribed to 0xC001 during group config.
+├── GenericPowerOnOffServer  (0x1006)  │ Enables receipt of lightness/on-off commands
 ├── GenericPowerOnOffSetup   (0x1007)  │ from external switches/dimmers.
 ├── LightLightnessServer     (0x1300)  │
 ├── LightLightnessSetup      (0x1301)  │
 ├── LightCTLServer           (0x1303)  │
 └── LightCTLSetupServer      (0x1304) ─┘
+
+Element 1 — CTL Temperature Element
+├── GenericLevelServer       (0x1002) ─┐ Subscribed to 0xC002 during group config.
+└── GenericDefaultTTServer   (0x1004) ─┘ Enables receipt of colour temperature level
+                                          commands from the Silvair switch's second controller.
 ```
 
-**Why server models on the iPhone?** The NordicMesh library only decodes incoming mesh messages for models registered in `localElements`. Without server models subscribed to 0xC001, group-addressed commands from external switches (e.g. `GenericOnOffSetUnacknowledged`) would arrive as `UnknownMessage` and could not be pattern-matched in `didReceiveMessage`.
+**Why server models on the iPhone?** The NordicMesh library only decodes incoming mesh messages for models registered in `localElements`. Without server models subscribed to the group addresses, group-addressed commands from external switches (e.g. `GenericOnOffSetUnacknowledged`) would arrive as `UnknownMessage` and could not be pattern-matched in `didReceiveMessage`.
+
+**Why a second element for CTL temperature?** The CTL temperature element on lighting nodes uses a separate `GenericLevelServer` bound to the `LightCTLTemperatureServer` — addressing that Generic Level channel controls colour temperature, not brightness. Mirroring this structure locally means the app can subscribe the second element to the separate 0xC002 group, ensuring Generic Level messages on 0xC001 (brightness) and 0xC002 (temperature) are delivered to different models and can be distinguished by destination address in `didReceiveMessage`.
 
 ### Proxy Filter Strategy
 
@@ -196,13 +204,18 @@ For each node:
 
 `MeshNetworkService.configureGroup(name:nodes:)`:
 
-### Group address
+### Group addresses
 
-Fixed at `0xC001`. Created in the mesh network if it doesn't already exist.
+Two groups are created (if they don't already exist):
+
+| Address | Name | Purpose |
+|---------|------|---------|
+| `0xC001` | `<room name>` | Main lighting group — OnOff, brightness, full CTL |
+| `0xC002` | `<room name> CTL Temperature` | CTL temperature channel — second Silvair controller |
 
 ### Subscription model sets
 
-**CTL Lightness element** (element containing `LightCTLServer` or `LightLightnessServer`):
+**CTL Lightness element** (element containing `LightCTLServer` or `LightLightnessServer`) → subscribed to **0xC001**:
 ```
 0x1000 GenericOnOffServer
 0x1002 GenericLevelServer
@@ -215,33 +228,43 @@ Fixed at `0xC001`. Created in the mesh network if it doesn't already exist.
 0x1304 LightCTLSetupServer
 ```
 
-**CTL Temperature element** (element containing `LightCTLTemperatureServer`):
+**CTL Temperature element** (element containing `LightCTLTemperatureServer`) → subscribed to **0xC002**:
 ```
 0x1002 GenericLevelServer
 0x1004 GenericDefaultTransitionTimeServer
 0x1306 LightCTLTemperatureServer
 ```
 
+Isolating the CTL temp element to 0xC002 prevents Generic Level messages on the main group from inadvertently driving colour temperature through the CTL temperature binding.
+
 Each matching model receives a `ConfigModelSubscriptionAdd(group:to:model)`.
 
 ### Switch/dimmer publication (Silvair detection)
 
-An element containing Silvair vendor model `(CID 0x0136 << 16 | ModelID 0x0001)` is treated as a switch element. Within that element, `GenericOnOffClient` (0x1001) and `GenericLevelClient` (0x1003) are configured to publish to 0xC001 via `ConfigModelPublicationSet` with:
-- TTL = 5
-- Period = disabled
-- Retransmit = disabled
+Elements are iterated with enumerated index to support the element+1 look-ahead.
+
+**Silvair element** (contains vendor model `CID 0x0136, ModelID 0x0001`):
+- `GenericOnOffClient` (0x1001) and `GenericLevelClient` (0x1003) → publish to **0xC001** (TTL=5, period=disabled, retransmit=disabled).
+
+**Element immediately after the Silvair element** (index+1):
+- `GenericLevelClient` (0x1003) → publish to **0xC002** (TTL=5, period=disabled, retransmit=disabled).
+- `GenericOnOffClient` in this element is left unconfigured.
+
+This allows the physical switch's second level controller to independently drive colour temperature while the first controller drives brightness.
 
 ### Local node configuration
 
-After all remote nodes are done, the iPhone's own local node is configured:
-- `ConfigModelAppBind` for each local server model in the set above.
-- `ConfigModelSubscriptionAdd` to 0xC001 for each local server model.
+After all remote nodes are done, the iPhone's local node is configured per-element:
 
-This causes the proxy (with the empty reject list) to deliver group-addressed messages from external switches/dimmers to the app's `didReceiveMessage` callback.
+**Element 0** (Primary — lightness/on-off servers):
+- `ConfigModelAppBind` + `ConfigModelSubscriptionAdd` to **0xC001** for each model in `localServerIds`.
+
+**Element 1** (CTL Temperature — GenericLevel + GenericDefaultTT servers):
+- `ConfigModelAppBind` + `ConfigModelSubscriptionAdd` to **0xC002** for each model in `localCTLTempServerIds`.
 
 ### Progress reporting
 
-Total operations are counted upfront. Each `sendConfig` call increments `completedOps` and sets `groupConfigProgress = completedOps / totalOps`. The UI also shows per-device state rows.
+Total operations are counted upfront across all nodes and both elements of the local node, including the Silvair element+1 publication ops. Each `sendConfig` call increments `completedOps` and sets `groupConfigProgress = completedOps / totalOps`. Per-device state rows track overall progress in the UI.
 
 ---
 
@@ -306,20 +329,42 @@ Messages the app sent to 0xC001 loop back via the proxy (TTL-1, different bytes)
 
 ### State update switch
 
+The destination address determines how Generic Level messages are interpreted:
+- `destination.address == 0xC002` → colour temperature command
+- anything else → brightness/lightness command
+
 ```swift
 switch message {
 case GenericOnOffSetUnacknowledged:  currentGroup.isOn = cmd.isOn
 case GenericOnOffStatus:             currentGroup.isOn = status.isOn
+
 case GenericLevelSet / Unacknowledged:
-    lightnessRaw = UInt16(Int32(cmd.level) + 32768)
-    currentGroup.lightness = Double(lightnessRaw) / 65535
-    // also updates isOn based on lightnessRaw == 0
+    if destination == 0xC002:
+        // Second Silvair controller → colour temperature
+        normalized = (Double(cmd.level) + 32768) / 65535     // 0.0–1.0
+        temp = tMin + UInt16(normalized * Double(tMax - tMin))
+        currentGroup.temperature = temp
+    else:
+        // Primary channel → brightness
+        lightnessRaw = UInt16(Int32(cmd.level) + 32768)
+        currentGroup.lightness = Double(lightnessRaw) / 65535
+        // also updates isOn based on lightnessRaw == 0
+
 case GenericDeltaSetUnacknowledged:
-    // Relative delta — applied to current lightness
-    currentLevel = Int32(currentGroup.lightness * 65535) - 32768
-    newLevel = clamp(currentLevel + cmd.delta, -32768, 32767)
-    lightnessRaw = UInt16(newLevel + 32768)
-    currentGroup.lightness = Double(lightnessRaw) / 65535
+    if destination == 0xC002:
+        // Delta from second controller → colour temperature change
+        fraction = clamp((currentTemp - tMin) / (tMax - tMin), 0, 1)
+        currentLevel = Int32(fraction * 65535) - 32768
+        newLevel = clamp(currentLevel + cmd.delta, -32768, 32767)
+        newFraction = (Double(newLevel) + 32768) / 65535
+        currentGroup.temperature = tMin + UInt16(newFraction * Double(tMax - tMin))
+    else:
+        // Relative delta — applied to current lightness
+        currentLevel = Int32(currentGroup.lightness * 65535) - 32768
+        newLevel = clamp(currentLevel + cmd.delta, -32768, 32767)
+        lightnessRaw = UInt16(newLevel + 32768)
+        currentGroup.lightness = Double(lightnessRaw) / 65535
+
 case GenericLevelStatus:             currentGroup.lightness = ...
 case LightLightnessSetUnacknowledged: currentGroup.lightness = ...
 case LightLightnessStatus:           currentGroup.lightness = ...
@@ -341,6 +386,19 @@ lightness_double = Double(lightness_uint16) / 65535.0
 level = Int32(lightness_double * 65535) - 32768
 ```
 
+### Level ↔ Temperature conversion
+
+BLE Mesh `GenericLevel` range is [-32768, 32767]. Temperature range is `[tMin, tMax]` in Kelvin (from `LightCTLTemperatureRangeStatus`).
+
+```
+normalized = (Double(level) + 32768) / 65535.0   // 0.0–1.0
+temperature = tMin + UInt16(normalized * Double(tMax - tMin))
+
+// Inverse (for delta):
+fraction = clamp((currentTemp - tMin) / (tMax - tMin), 0.0, 1.0)
+level = Int32(fraction * 65535) - 32768
+```
+
 ---
 
 ## Model Delegates
@@ -359,7 +417,7 @@ ConfigModelSubscriptionStatus, ConfigModelPublicationStatus
 
 ### `LightServerDelegate`
 
-Assigned to all 9 local server models. Registers opcodes so the library:
+Assigned to all local server models across both elements (element 0 and element 1). Registers opcodes so the library:
 1. Decodes incoming set/status messages as typed objects (enabling the switch dispatch in `didReceiveMessage`).
 2. Supports group subscriptions (`isSubscriptionSupported = true`).
 
@@ -448,7 +506,8 @@ Only the latest pending value is ever sent. Fast slider drags produce at most on
 
 | Constant | Value | Purpose |
 |----------|-------|---------|
-| Group address | `0xC001` | Fixed mesh group for all lighting control |
+| Main group address | `0xC001` | Lighting control — OnOff, brightness, full CTL |
+| CTL temp group address | `0xC002` | Colour temperature channel — second Silvair controller |
 | Silvair vendor model ID | `(0x0136 << 16) \| 0x0001` | Identifies switch elements for publication config |
 | CTL transition time | 200ms (2 × 100ms steps) | LightCTLSet smooth transition |
 | Proxy scan timeout | 15s | connectToProxy gives up after 15s |

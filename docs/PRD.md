@@ -141,9 +141,15 @@ pending (0%) → inProgress(0.2) → inProgress(0.4) → inProgress(0.7) → inP
 | Tap "Create Group" | Starts group configuration. Form replaced with progress view. |
 
 **Configuration sequence**:
-1. For each provisioned node: subscribe each model in the lighting element (CTL lightness binding IDs) to 0xC001. Subscribe CTL temperature element models (CTL temp binding IDs) to 0xC001.
-2. For each element that contains the Silvair vendor model (CID 0x0136, Model 0x0001): configure `GenericOnOffClient` and `GenericLevelClient` publication to 0xC001 with TTL=5.
-3. For the local node (the iPhone): bind the app key and subscribe the same server model set to 0xC001, enabling real-time state updates.
+1. For each provisioned node:
+   - Primary lighting element (contains `LightCTLServer` or `LightLightnessServer`): subscribe CTL lightness binding models to **0xC001**.
+   - CTL temperature element (contains `LightCTLTemperatureServer`): subscribe CTL temp binding models to **0xC002** (not 0xC001). Isolating this element prevents any Generic Level client addressed to the main group from inadvertently driving colour temperature.
+2. For each element containing the Silvair vendor model (CID 0x0136, Model 0x0001):
+   - Configure `GenericOnOffClient` and `GenericLevelClient` in that element to publish to **0xC001** (TTL=5).
+   - Configure the `GenericLevelClient` in the **immediately following element** (element+1) to publish to **0xC002**. This allows the switch's second physical controller to drive colour temperature independently. The `GenericOnOffClient` in element+1 is left unconfigured.
+3. For the local node (the iPhone):
+   - Element 0 server models: bind app key and subscribe to **0xC001**, enabling receipt of lightness/on-off commands from external switches/dimmers.
+   - Element 1 (`GenericLevelServer` + `GenericDefaultTransitionTimeServer`): bind app key and subscribe to **0xC002**, enabling receipt of colour temperature level commands from the switch's second controller.
 
 **Post-completion**: Reconnects to proxy, then navigates to `.deviceControl`.
 
@@ -248,9 +254,19 @@ Total config operations are counted upfront (one per `ConfigModelSubscriptionAdd
 
 ## External Device Interaction
 
-The app is designed to interoperate with Silvair-compatible switches and dimmers that send to group address 0xC001:
+The app interoperates with Silvair-compatible switches and dimmers. The message destination determines whether a command controls brightness or colour temperature.
 
-- **On/Off switches**: Send `GenericOnOffSetUnacknowledged` to 0xC001. The app receives this and updates `currentGroup.isOn`. The power toggle reflects the change.
-- **Dimmers (absolute level)**: May send `GenericLevelSetUnacknowledged` or `GenericLevelSet` (acknowledged). Level is in range [-32768, 32767]. Converted to lightness: `lightnessRaw = UInt16(level + 32768); lightness = lightnessRaw / 65535`. The brightness slider reflects the change.
-- **Dimmers (relative delta)**: Send `GenericDeltaSetUnacknowledged` (opcode 0x820A). Delta is applied to the current lightness level: `newLevel = clamp(currentLevel + delta, -32768, 32767)`. The brightness slider reflects the change.
-- All external messages are received because the iPhone's local server models are subscribed to 0xC001 during group configuration.
+### Main group (0xC001) — brightness / on-off
+
+- **On/Off switches**: Send `GenericOnOffSetUnacknowledged` to 0xC001. Updates `currentGroup.isOn`; the power toggle reflects the change.
+- **Dimmers (absolute level)**: Send `GenericLevelSetUnacknowledged` or `GenericLevelSet` (acknowledged) to 0xC001. Level [-32768, 32767] → lightness: `lightnessRaw = UInt16(level + 32768); lightness = lightnessRaw / 65535`. Brightness slider reflects the change.
+- **Dimmers (relative delta)**: Send `GenericDeltaSetUnacknowledged` (opcode 0x820A) to 0xC001. Delta applied to current lightness level: `newLevel = clamp(currentLevel + delta, −32768, 32767)`. Brightness slider reflects the change.
+
+Received because the iPhone's local element 0 server models are subscribed to 0xC001 during group configuration.
+
+### CTL temperature group (0xC002) — colour temperature
+
+- **Second Silvair controller (absolute level)**: Sends `GenericLevelSetUnacknowledged` or `GenericLevelSet` to 0xC002. Level [-32768, 32767] maps linearly to the device's discovered temperature range `[temperatureRangeMin, temperatureRangeMax]`. The colour temperature slider reflects the change.
+- **Second Silvair controller (relative delta)**: Sends `GenericDeltaSetUnacknowledged` to 0xC002. Current temperature is converted to an equivalent level value, the delta is applied, and the result is converted back to Kelvin using the same linear mapping. Colour temperature slider reflects the change.
+
+Received because the iPhone's local element 1 `GenericLevelServer` is subscribed to 0xC002 during group configuration.
