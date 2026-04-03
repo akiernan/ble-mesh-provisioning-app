@@ -782,6 +782,15 @@ final class MeshNetworkService: NSObject {
                 }
             }
         }
+
+        // Wait for the proxy filter handshake (Secure Network beacon → SetFilterType →
+        // FilterStatus) to complete. Until FilterStatus is received, proxyFilter.proxy is
+        // nil and the library logs a spurious "No GATT Proxy connected" warning on every
+        // send. Up to 5 seconds; if the proxy is unusually slow we continue anyway.
+        for _ in 0..<50 {
+            if manager.proxyFilter.proxy != nil { break }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
     }
 
     // MARK: - Light CTL Control
@@ -827,18 +836,6 @@ final class MeshNetworkService: NSObject {
     /// updating `currentGroup` to reflect the real device values.
     func fetchCurrentState() async {
         guard let node = provisionedNodes.first else { return }
-
-        // The proxy filter setup (beacon exchange, SetFilterType, AddAddressesToFilter)
-        // happens asynchronously after bearerDidOpen. Wait for it to complete.
-        for _ in 0..<30 { // up to 3 seconds
-            if manager.proxyFilter.proxy != nil { break }
-            try? await Task.sleep(for: .milliseconds(100))
-        }
-        guard manager.proxyFilter.proxy != nil else {
-            logger.warning("🔄 Proxy filter not ready — skipping state query")
-            return
-        }
-
         guard let appKey = manager.meshNetwork?.applicationKeys.first else { return }
 
         // Note: the proxy filter is configured as an empty reject list (= accept all) via
