@@ -504,10 +504,19 @@ final class MeshNetworkService: NSObject {
 
         // Step 3: Configure model binding on each node
         keyBindingStepStates[.configureModels] = .inProgress
+        nodeKeyBindingStates = nodes.map {
+            NodeKeyBindingState(id: $0.uuid, name: $0.name ?? "Mesh Node", state: .pending)
+        }
         for node in nodes {
+            if let idx = nodeKeyBindingStates.firstIndex(where: { $0.id == node.uuid }) {
+                nodeKeyBindingStates[idx].state = .inProgress
+            }
             let hasModels = node.elements.contains { !$0.models.isEmpty }
             if !hasModels {
                 logger.warning("🔧 Node \(node.name ?? "unknown") has no models — skipping model bind")
+                if let idx = nodeKeyBindingStates.firstIndex(where: { $0.id == node.uuid }) {
+                    nodeKeyBindingStates[idx].state = .completed
+                }
                 continue
             }
             for (i, element) in node.elements.enumerated() {
@@ -523,6 +532,9 @@ final class MeshNetworkService: NSObject {
                         try? await Task.sleep(for: .milliseconds(100))
                     }
                 }
+            }
+            if let idx = nodeKeyBindingStates.firstIndex(where: { $0.id == node.uuid }) {
+                nodeKeyBindingStates[idx].state = .completed
             }
         }
         keyBindingStepStates[.configureModels] = .completed

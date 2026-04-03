@@ -79,7 +79,9 @@ struct KeyBindingView: View {
                                 step: step,
                                 state: vm.stepStates[step] ?? .pending
                             )
-                            if step == .distributeKeys && !vm.nodeKeyBindingStates.isEmpty {
+                            if (step == .distributeKeys || step == .configureModels)
+                                && vm.stepStates[step] == .inProgress
+                                && !vm.nodeKeyBindingStates.isEmpty {
                                 VStack(spacing: 4) {
                                     ForEach(vm.nodeKeyBindingStates) { nodeState in
                                         NodeKeyBindingRow(nodeState: nodeState)
