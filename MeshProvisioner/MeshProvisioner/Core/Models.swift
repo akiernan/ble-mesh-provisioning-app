@@ -102,8 +102,8 @@ struct MeshGroupConfig: Identifiable, Hashable {
     var lightness: Double  // 0.0 – 1.0
     var temperature: UInt16  // Kelvin (2000–8000)
 
-    static let temperatureMin: UInt16 = 2000
-    static let temperatureMax: UInt16 = 8000
+    static let temperatureMin: UInt16 = 800
+    static let temperatureMax: UInt16 = 20000
 
     var temperatureRangeMin: UInt16 = MeshGroupConfig.temperatureMin
     var temperatureRangeMax: UInt16 = MeshGroupConfig.temperatureMax
