@@ -69,6 +69,13 @@ struct KeyBindingView: View {
                                            startPoint: .leading, endPoint: .trailing)
                         )
                         .scaleEffect(x: 1, y: 1.5)
+                        .accessibilityLabel("Configuration progress")
+                        .accessibilityValue({
+                            let completed = KeyBindingStep.allCases.filter {
+                                vm.stepStates[$0] == .completed
+                            }.count
+                            return "\(completed) of \(KeyBindingStep.allCases.count) steps complete"
+                        }())
                 }
 
                 // Steps
@@ -112,6 +119,8 @@ struct KeyBindingView: View {
             .padding(.horizontal, 24)
             .padding(.bottom, 40)
         }
+        .sensoryFeedback(.success, trigger: vm.allCompleted)
+        .sensoryFeedback(.error, trigger: vm.errorMessage)
     }
 
     private var securityCard: some View {
@@ -175,6 +184,8 @@ private struct NodeKeyBindingRow: View {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(borderColor, lineWidth: 1)
         )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(nodeState.name): \(stateName)")
     }
 
     private var stateIcon: some View {
@@ -266,6 +277,17 @@ private struct KeyBindingStepRow: View {
             RoundedRectangle(cornerRadius: 14)
                 .stroke(rowBorderColor, lineWidth: state == .inProgress ? 2 : 1)
         )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(step.title): \(accessibilityStateName)")
+    }
+
+    private var accessibilityStateName: String {
+        switch state {
+        case .pending:    return "waiting"
+        case .inProgress: return "in progress"
+        case .completed:  return "complete"
+        case .failed(let msg): return "failed, \(msg)"
+        }
     }
 
     private var stateIcon: some View {

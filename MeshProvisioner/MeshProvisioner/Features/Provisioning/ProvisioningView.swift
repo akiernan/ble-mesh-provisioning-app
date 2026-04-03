@@ -67,6 +67,8 @@ struct ProvisioningView: View {
                                            startPoint: .leading, endPoint: .trailing)
                         )
                         .scaleEffect(x: 1, y: 1.5)
+                        .accessibilityLabel("Overall progress")
+                        .accessibilityValue("\(vm.completedCount) of \(vm.devices.count) complete")
                 }
 
                 // Device list
@@ -106,6 +108,8 @@ struct ProvisioningView: View {
             .padding(.horizontal, 24)
             .padding(.bottom, 40)
         }
+        .sensoryFeedback(.success, trigger: vm.completedCount == vm.devices.count && !vm.devices.isEmpty)
+        .sensoryFeedback(.error, trigger: vm.errorMessage)
     }
 }
 
@@ -138,6 +142,23 @@ private struct ProvisioningDeviceRow: View {
             RoundedRectangle(cornerRadius: 14)
                 .stroke(rowBorderColor, lineWidth: 2)
         )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityDescription)
+    }
+
+    private var accessibilityDescription: String {
+        switch state {
+        case .pending:    return "\(device.name), waiting"
+        case .connecting: return "\(device.name), connecting"
+        case .inProgress: return "\(device.name), provisioning, \(Int(currentDeviceProgressValue * 100)) percent"
+        case .completed:  return "\(device.name), provisioned"
+        case .failed(let msg): return "\(device.name), failed: \(msg)"
+        }
+    }
+
+    private var currentDeviceProgressValue: Double {
+        if case .inProgress(let p) = state { return p }
+        return 0
     }
 
     private var stateIcon: some View {

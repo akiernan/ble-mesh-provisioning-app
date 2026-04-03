@@ -186,12 +186,17 @@ private struct DeviceRow: View {
         }
         .buttonStyle(.plain)
         .animation(.spring(response: 0.2), value: isSelected)
+        .sensoryFeedback(.selection, trigger: isSelected)
+        .accessibilityLabel("\(device.name), \(device.signalStrength.label) signal, \(device.rssi) dBm")
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityHint("Double tap to \(isSelected ? "deselect" : "select")")
     }
 
     private var signalIcon: some View {
         Image(systemName: "wave.3.right")
             .font(.title3)
             .foregroundStyle(signalColor)
+            .accessibilityHidden(true)
     }
 
     private var signalColor: Color {
@@ -214,5 +219,6 @@ private struct DeviceRow: View {
                     .foregroundStyle(.white)
             }
         }
+        .accessibilityHidden(true)
     }
 }

@@ -67,6 +67,7 @@ struct GroupConfigView: View {
             .padding(.horizontal, 24)
             .padding(.bottom, 40)
         }
+        .sensoryFeedback(.error, trigger: vm.errorMessage)
     }
 
     // MARK: - Setup form
@@ -195,6 +196,14 @@ struct GroupConfigView: View {
                                        startPoint: .leading, endPoint: .trailing)
                     )
                     .scaleEffect(x: 1, y: 1.5)
+                    .accessibilityLabel("Setup progress")
+                    .accessibilityValue({
+                        let completed = vm.nodeGroupConfigStates.filter { $0.state == .completed }.count
+                        let total = vm.nodeGroupConfigStates.count
+                        return total > 0
+                            ? "\(completed) of \(total) devices complete"
+                            : "\(Int(vm.configProgress * 100)) percent"
+                    }())
             }
 
             // Per-device rows
@@ -233,6 +242,8 @@ private struct NodeGroupConfigRow: View {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(borderColor, lineWidth: 1)
         )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(nodeState.name): \(stateName)")
     }
 
     private var stateIcon: some View {

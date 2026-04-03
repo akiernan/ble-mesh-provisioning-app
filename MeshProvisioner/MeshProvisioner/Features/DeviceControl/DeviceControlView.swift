@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct DeviceControlView: View {
     @Environment(MeshNetworkService.self) private var meshService
@@ -31,6 +32,7 @@ struct DeviceControlView: View {
         }
         .alert("Reset Mesh Network?", isPresented: $showResetConfirm) {
             Button("Reset", role: .destructive) {
+                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                 viewModel?.restart()
             }
             Button("Cancel", role: .cancel) {}
@@ -74,6 +76,7 @@ struct DeviceControlView: View {
                 .padding(24)
             }
         }
+        .sensoryFeedback(.error, trigger: vm.errorMessage)
     }
 
     // MARK: - Header
@@ -107,6 +110,7 @@ struct DeviceControlView: View {
                     .background(Color.white.opacity(0.12))
                     .clipShape(RoundedRectangle(cornerRadius: 10))
             }
+            .accessibilityLabel("Reset mesh network")
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 20)
@@ -132,6 +136,10 @@ struct DeviceControlView: View {
                     set: { _ in vm.togglePower() }
                 ))
                 .toggleStyle(CTLToggleStyle())
+                .accessibilityLabel("Power")
+                .accessibilityValue(group.isOn ? "On" : "Off")
+                .accessibilityHint("Double tap to turn \(group.isOn ? "off" : "on")")
+                .sensoryFeedback(.impact, trigger: group.isOn)
             }
         }
         .padding(20)
@@ -166,6 +174,8 @@ struct DeviceControlView: View {
                     LinearGradient(colors: [.blue, .cyan],
                                    startPoint: .leading, endPoint: .trailing)
                 )
+                .accessibilityLabel("Brightness")
+                .accessibilityValue("\(Int(group.lightness * 100)) percent")
                 HStack {
                     Text("0%").font(.caption).foregroundStyle(.secondary)
                     Spacer()
@@ -235,6 +245,8 @@ struct DeviceControlView: View {
                 step: 1
             )
             .tint(.clear)
+            .accessibilityLabel("Color temperature")
+            .accessibilityValue("\(group.temperature) Kelvin, \(group.temperatureLabel())")
         }
         .frame(height: 32)
     }
@@ -272,6 +284,7 @@ struct DeviceControlView: View {
                             Circle()
                                 .fill(vm.group?.isOn == true ? Color.green : Color(.systemGray3))
                                 .frame(width: 10, height: 10)
+                                .accessibilityHidden(true)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(name).font(.subheadline).fontWeight(.medium)
                             }
@@ -288,6 +301,8 @@ struct DeviceControlView: View {
                         .padding(12)
                         .background(Color(.secondarySystemBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("\(name), Connected, \(vm.group?.isOn == true ? "On" : "Off")")
                     }
                 }
                 .padding(.horizontal, 16)
@@ -379,11 +394,11 @@ private struct CTLToggleStyle: ToggleStyle {
                           ? LinearGradient(colors: [.blue, .cyan], startPoint: .leading, endPoint: .trailing)
                           : LinearGradient(colors: [Color(.systemGray4), Color(.systemGray4)],
                                            startPoint: .leading, endPoint: .trailing))
-                    .frame(width: 80, height: 40)
+                    .frame(width: 80, height: 44)
                 Circle()
                     .fill(.white)
                     .shadow(radius: 3)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 36, height: 36)
                     .offset(x: configuration.isOn ? 18 : -18)
             }
         }
