@@ -1127,27 +1127,32 @@ extension MeshNetworkService: MeshNetworkDelegate {
         }
         // Update group state from incoming commands (switch) and status responses.
         Task { @MainActor in
-            if let cmd = message as? GenericOnOffSetUnacknowledged {
+            switch message {
+            case let cmd as GenericOnOffSetUnacknowledged:
                 logger.info("🔄 OnOff command received: \(cmd.isOn ? "ON" : "OFF")")
                 self.currentGroup?.isOn = cmd.isOn
-            }
-            if let status = message as? GenericOnOffStatus {
+
+            case let status as GenericOnOffStatus:
                 logger.info("🔄 OnOff state: \(status.isOn ? "ON" : "OFF")")
                 self.currentGroup?.isOn = status.isOn
-            }
-            // Absolute Generic Level (0x8206/0x8207): maps to lightness via Lightness = Level + 32768.
-            let levelValue: Int16? = (message as? GenericLevelSet)?.level
-                ?? (message as? GenericLevelSetUnacknowledged)?.level
-            if let level = levelValue {
-                let lightnessRaw = UInt16(Int32(level) + 32768)
+
+            case let cmd as GenericLevelSet:
+                let lightnessRaw = UInt16(Int32(cmd.level) + 32768)
                 let lightness = Double(lightnessRaw) / 65535.0
-                logger.info("🔄 Level command received: \(level) → lightness=\(Int(lightness * 100))%")
+                logger.info("🔄 Level command received: \(cmd.level) → lightness=\(Int(lightness * 100))%")
                 self.currentGroup?.lightness = lightness
                 if lightnessRaw == 0 { self.currentGroup?.isOn = false }
                 else if self.currentGroup?.isOn == false { self.currentGroup?.isOn = true }
-            }
-            // Delta Generic Level (0x820A): apply relative change to current level.
-            if let cmd = message as? GenericDeltaSetUnacknowledged {
+
+            case let cmd as GenericLevelSetUnacknowledged:
+                let lightnessRaw = UInt16(Int32(cmd.level) + 32768)
+                let lightness = Double(lightnessRaw) / 65535.0
+                logger.info("🔄 Level command received: \(cmd.level) → lightness=\(Int(lightness * 100))%")
+                self.currentGroup?.lightness = lightness
+                if lightnessRaw == 0 { self.currentGroup?.isOn = false }
+                else if self.currentGroup?.isOn == false { self.currentGroup?.isOn = true }
+
+            case let cmd as GenericDeltaSetUnacknowledged:
                 let currentLevel = Int32((self.currentGroup?.lightness ?? 0.5) * 65535) - 32768
                 let newLevel = max(-32768, min(32767, currentLevel + cmd.delta))
                 let lightnessRaw = UInt16(newLevel + 32768)
@@ -1156,46 +1161,46 @@ extension MeshNetworkService: MeshNetworkDelegate {
                 self.currentGroup?.lightness = lightness
                 if lightnessRaw == 0 { self.currentGroup?.isOn = false }
                 else if self.currentGroup?.isOn == false { self.currentGroup?.isOn = true }
-            }
-            if let status = message as? GenericLevelStatus {
+
+            case let status as GenericLevelStatus:
                 let lightnessRaw = UInt16(Int32(status.level) + 32768)
                 let lightness = Double(lightnessRaw) / 65535.0
                 logger.info("🔄 Level status received: \(status.level) → lightness=\(Int(lightness * 100))%")
                 self.currentGroup?.lightness = lightness
-            }
-            if let cmd = message as? LightLightnessSetUnacknowledged {
+
+            case let cmd as LightLightnessSetUnacknowledged:
                 let lightness = Double(cmd.lightness) / 65535.0
                 logger.info("🔄 Lightness command received: lightness=\(Int(lightness * 100))%")
                 self.currentGroup?.lightness = lightness
                 if cmd.lightness == 0 { self.currentGroup?.isOn = false }
                 else if self.currentGroup?.isOn == false { self.currentGroup?.isOn = true }
-            }
-            if let status = message as? LightLightnessStatus {
+
+            case let status as LightLightnessStatus:
                 let lightness = Double(status.lightness) / 65535.0
                 logger.info("🔄 Lightness status received: lightness=\(Int(lightness * 100))%")
                 self.currentGroup?.lightness = lightness
-            }
-            if let cmd = message as? LightCTLSetUnacknowledged {
+
+            case let cmd as LightCTLSetUnacknowledged:
                 let lightness = Double(cmd.lightness) / 65535.0
                 logger.info("🔄 CTL command received: lightness=\(Int(lightness * 100))%, temp=\(cmd.temperature)K")
                 self.currentGroup?.lightness = lightness
                 self.currentGroup?.temperature = cmd.temperature
-            }
-            if let status = message as? LightCTLStatus {
+
+            case let status as LightCTLStatus:
                 let lightness = Double(status.lightness) / 65535.0
                 logger.info("🔄 CTL state: lightness=\(Int(lightness * 100))%, temp=\(status.temperature)K")
                 self.currentGroup?.lightness = lightness
                 self.currentGroup?.temperature = status.temperature
-            }
-            if let status = message as? LightCTLTemperatureRangeStatus {
+
+            case let status as LightCTLTemperatureRangeStatus:
                 logger.info("🔄 CTL temperature range: \(status.min)K–\(status.max)K")
                 self.currentGroup?.temperatureRangeMin = status.min
                 self.currentGroup?.temperatureRangeMax = status.max
                 if let temp = self.currentGroup?.temperature {
                     self.currentGroup?.temperature = max(status.min, min(status.max, temp))
                 }
-            }
-            if let status = message as? LightLightnessRangeStatus, status.min > 0 {
+
+            case let status as LightLightnessRangeStatus where status.min > 0:
                 let rMin = Double(status.min) / 65535.0
                 let rMax = Double(status.max) / 65535.0
                 logger.info("🔄 Lightness range: \(Int(rMin * 100))%–\(Int(rMax * 100))%")
@@ -1204,6 +1209,9 @@ extension MeshNetworkService: MeshNetworkDelegate {
                 if let l = self.currentGroup?.lightness {
                     self.currentGroup?.lightness = max(rMin, min(rMax, l))
                 }
+
+            default:
+                break
             }
         }
     }
