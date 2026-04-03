@@ -1,0 +1,460 @@
+# Architecture Document — BLE Mesh Provisioning App
+
+## Technology Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Platform | iOS 17+ / macOS 14+ |
+| Language | Swift 6.0 (strict concurrency) |
+| UI | SwiftUI |
+| Architecture | MVVM with `@Observable` |
+| BLE Mesh library | NordicMesh (IOS-nRF-Mesh-Library) via SPM |
+| Concurrency | Swift async/await, `@MainActor`, `nonisolated` callbacks |
+| Persistence | `MeshNetwork.json` in Documents, managed by `MeshNetworkManager` |
+
+---
+
+## Project Structure
+
+```
+MeshProvisioner/
+├── App/
+│   ├── MeshProvisionerApp.swift     # @main, NavigationStack root, environment injection
+│   └── AppRouter.swift              # @Observable NavigationPath wrapper
+├── Core/
+│   ├── MeshNetworkService.swift     # All BLE/mesh logic (single service class)
+│   └── Models.swift                 # Value types: DiscoveredDevice, MeshGroupConfig, enums
+└── Features/
+    ├── Discovery/
+    │   ├── DeviceDiscoveryView.swift
+    │   └── DeviceDiscoveryViewModel.swift
+    ├── Provisioning/
+    │   ├── ProvisioningView.swift
+    │   └── ProvisioningViewModel.swift
+    ├── KeyBinding/
+    │   ├── KeyBindingView.swift
+    │   └── KeyBindingViewModel.swift
+    ├── GroupConfig/
+    │   ├── GroupConfigView.swift
+    │   └── GroupConfigViewModel.swift
+    └── DeviceControl/
+        ├── DeviceControlView.swift
+        └── DeviceControlViewModel.swift
+```
+
+---
+
+## Navigation
+
+`AppRouter` wraps `NavigationPath`. The root view is always `DeviceDiscoveryView`. Routes:
+
+```swift
+enum AppRoute: Hashable {
+    case provisioning
+    case keyBinding
+    case groupConfig
+    case deviceControl
+}
+```
+
+On app launch, `MeshProvisionerApp.onAppear` checks `meshService.hasProvisionedNetwork`. If `true` (a group at 0xC001 exists and nodes are provisioned), it immediately pushes `.deviceControl`, skipping the setup flow.
+
+All post-provisioning screens hide the back button (`navigationBarBackButtonHidden(true)`) to enforce the forward-only flow. The only way back to discovery is via factory reset.
+
+---
+
+## Dependency Injection
+
+`MeshNetworkService` and `AppRouter` are created as `@State` in `MeshProvisionerApp` and injected via `.environment(meshService)` / `.environment(router)`. ViewModels receive them via constructor injection from their parent View's `@Environment`.
+
+---
+
+## MeshNetworkService
+
+The central service class. `@Observable @MainActor`. Owns all BLE and mesh state.
+
+### Init sequence
+
+1. Creates `MeshNetworkManager`.
+2. Creates `CBCentralManager` (for scanning) on `.main`.
+3. Calls `setupMeshNetwork()` — loads or creates the mesh network and app key.
+4. Calls `setupLocalElements()` — installs local models and configures proxy filter.
+
+### Local Node Element Structure
+
+The iPhone presents itself as a mesh node with one Primary Element containing 11 models:
+
+```
+Primary Element
+├── GenericOnOffClient       (0x1001) — sends GenericOnOffSet to group
+├── LightCTLClient           (0x1305) — sends LightCTLSet to group; receives status
+├── GenericOnOffServer       (0x1000) ─┐
+├── GenericLevelServer       (0x1002)  │
+├── GenericDefaultTTServer   (0x1004)  │ All subscribed to 0xC001 during group config.
+├── GenericPowerOnOffServer  (0x1006)  │ Enables receipt of group-addressed commands
+├── GenericPowerOnOffSetup   (0x1007)  │ from external switches/dimmers.
+├── LightLightnessServer     (0x1300)  │
+├── LightLightnessSetup      (0x1301)  │
+├── LightCTLServer           (0x1303)  │
+└── LightCTLSetupServer      (0x1304) ─┘
+```
+
+**Why server models on the iPhone?** The NordicMesh library only decodes incoming mesh messages for models registered in `localElements`. Without server models subscribed to 0xC001, group-addressed commands from external switches (e.g. `GenericOnOffSetUnacknowledged`) would arrive as `UnknownMessage` and could not be pattern-matched in `didReceiveMessage`.
+
+### Proxy Filter Strategy
+
+```swift
+manager.proxyFilter.initialState = .rejectList(addresses: [])
+```
+
+An empty reject list means the GATT proxy forwards **all** mesh traffic to the iPhone. This is critical for two reasons:
+
+1. `ProxyFilter.add(address:)` is `internal` in the NordicMesh library — it cannot be called from app code to manage an accept list after connection.
+2. The accept-list alternative would require knowing all relevant group addresses at the moment of proxy connection. The empty reject list avoids this entirely.
+
+**CRITICAL**: Never call `proxyFilter.add(address:)` anywhere in app code. When the filter is in reject-list mode, calling `add()` would add the address to the **reject** list (blocking), not the accept list (allowing).
+
+The filter is set via `initialState` before connection. When the proxy connects, `newProxyDidConnect()` in the library sends `SetFilterType(.rejectList)` followed by the empty list. The proxy then forwards everything. The app receives `FilterStatus` and `proxyFilter.proxy` becomes non-nil.
+
+---
+
+## Provisioning Pipeline
+
+### Overview
+
+Each device is provisioned independently over its own `PBGattBearer` (one CBCentralManager-driven GATT connection per device). The flow is sequential in `ProvisioningViewModel.runProvisioning()`.
+
+### Sequence per device
+
+```
+1. provisionDevice(device)
+   └── provisionWithPeripheral(device:peripheral:)
+       ├── Create UnprovisionedDevice(uuid: device.id, ...)
+       ├── Create PBGattBearer(targetWithIdentifier: peripheral.identifier)
+       ├── manager.provision(unprovisionedDevice:over:bearer)  → ProvisioningManager
+       ├── Create ProvisioningBearerBridge (strong reference — bearer.delegate is weak)
+       ├── bearer.open()
+       └── await CheckedThrowingContinuation<Node>
+           ├── bearerDidOpen → pm.identify(andAttractFor: 0)
+           ├── provisioningState(.requestingCapabilities) → inProgress(0.2)
+           ├── provisioningState(.capabilitiesReceived)   → inProgress(0.4)
+           │   └── pm.provision(algorithm: .BTM_ECDH_P256_CMAC_AES128_AES_CCM,
+           │                    publicKey: .noOobPublicKey,
+           │                    authenticationMethod: .noOob)
+           ├── provisioningState(.provisioning)           → inProgress(0.7)
+           └── provisioningState(.complete)               → inProgress(1.0) → .completed
+               └── finishProvisioning(.success(node))
+                   └── continuation.resume(returning: node)
+2. provisionedNodes.append(node)
+3. 400ms delay before next device
+```
+
+### OOB information
+
+Extracted from the last 2 bytes (bytes 16–17) of the `MeshProvisioningService` advertisement service data. Used as `OobInformation` in `UnprovisionedDevice`. With `authenticationMethod: .noOob`, no user input is required.
+
+### After provisioning
+
+After the last device is provisioned, a 1-second delay allows the devices to reboot from PB-GATT mode into proxy mode before `performKeyBinding` attempts to connect.
+
+---
+
+## Key Binding Pipeline
+
+`MeshNetworkService.performKeyBinding(nodes:)` — four sequential steps:
+
+### Step 0: Connect to Proxy (`connectProxy`)
+
+- 2-second delay to allow devices to transition from PB-GATT to proxy advertising mode.
+- `connectToProxy()` scans for `MeshProxyService.uuid`, connects, and awaits bearer open.
+- After bearer open, polls `manager.proxyFilter.proxy` every 100ms for up to 5 seconds until `FilterStatus` is received and the proxy is ready.
+
+### Step 1: Generate Application Key (`generateKey`)
+
+- Retrieves the existing app key (created during `setupMeshNetwork`) or creates a new 128-bit key bound to the network key.
+- 300ms visual pause.
+
+### Step 2: Distribute Keys (`distributeKeys`)
+
+For each node:
+1. If the node has no models (composition data not yet fetched), sends `ConfigCompositionDataGet(page: 0)` → `sendConfig()`.
+2. Sends `ConfigAppKeyAdd(applicationKey: appKey)` → `sendConfig()`.
+3. Per-device sub-row in the UI transitions: `.pending → .inProgress → .completed`.
+
+### Step 3: Configure Model App Bindings (`configureModels`)
+
+For each node:
+- Iterates every element, every model.
+- Skips config server (0x0000) and config client (0x0001).
+- Sends `ConfigModelAppBind(applicationKey:to:model)` for every other SIG model.
+- 100ms delay between binds to avoid flooding the BLE bearer.
+- Per-device sub-row transitions: `.pending → .inProgress → .completed`.
+
+---
+
+## Group Configuration Pipeline
+
+`MeshNetworkService.configureGroup(name:nodes:)`:
+
+### Group address
+
+Fixed at `0xC001`. Created in the mesh network if it doesn't already exist.
+
+### Subscription model sets
+
+**CTL Lightness element** (element containing `LightCTLServer` or `LightLightnessServer`):
+```
+0x1000 GenericOnOffServer
+0x1002 GenericLevelServer
+0x1004 GenericDefaultTransitionTimeServer
+0x1006 GenericPowerOnOffServer
+0x1007 GenericPowerOnOffSetupServer
+0x1300 LightLightnessServer
+0x1301 LightLightnessSetupServer
+0x1303 LightCTLServer
+0x1304 LightCTLSetupServer
+```
+
+**CTL Temperature element** (element containing `LightCTLTemperatureServer`):
+```
+0x1002 GenericLevelServer
+0x1004 GenericDefaultTransitionTimeServer
+0x1306 LightCTLTemperatureServer
+```
+
+Each matching model receives a `ConfigModelSubscriptionAdd(group:to:model)`.
+
+### Switch/dimmer publication (Silvair detection)
+
+An element containing Silvair vendor model `(CID 0x0136 << 16 | ModelID 0x0001)` is treated as a switch element. Within that element, `GenericOnOffClient` (0x1001) and `GenericLevelClient` (0x1003) are configured to publish to 0xC001 via `ConfigModelPublicationSet` with:
+- TTL = 5
+- Period = disabled
+- Retransmit = disabled
+
+### Local node configuration
+
+After all remote nodes are done, the iPhone's own local node is configured:
+- `ConfigModelAppBind` for each local server model in the set above.
+- `ConfigModelSubscriptionAdd` to 0xC001 for each local server model.
+
+This causes the proxy (with the empty reject list) to deliver group-addressed messages from external switches/dimmers to the app's `didReceiveMessage` callback.
+
+### Progress reporting
+
+Total operations are counted upfront. Each `sendConfig` call increments `completedOps` and sets `groupConfigProgress = completedOps / totalOps`. The UI also shows per-device state rows.
+
+---
+
+## `sendConfig` — Config Message Helper
+
+Many config messages in the NordicMesh library return responses as `UnknownMessage` rather than their typed response class (because `ConfigurationClientHandler` only decodes messages for models it has registered). To work around this, `sendConfig` uses a custom keying mechanism:
+
+```swift
+struct ConfigContinuationKey: Hashable {
+    let sourceAddress: UInt16   // node's primary unicast address
+    let responseOpCode: UInt32  // expected response opCode
+}
+```
+
+In `meshNetworkManager(_:didReceiveMessage:sentFrom:to:)`, **before** the loopback guard, the incoming message's `opCode` is matched against `pendingConfigContinuations`. If a match is found, the continuation is resumed. This fires regardless of whether the message is typed or `UnknownMessage`.
+
+A fallback 8-second timeout per send prevents the pipeline from hanging if a device never responds.
+
+---
+
+## Proxy Connection Lifecycle
+
+```
+connectToProxy()
+  ├── Guard: mesh network exists
+  ├── Guard: not already connected
+  ├── Wait for CBManagerState == .poweredOn (up to 5s)
+  ├── scanForPeripherals(withServices: [MeshProxyService.uuid])
+  ├── centralManager(_:didDiscover:) → connectToProxyPeripheral(_:)
+  │   ├── Create GattBearer(targetWithIdentifier:)
+  │   ├── bearer.dataDelegate = manager
+  │   ├── manager.transmitter = bearer
+  │   └── bearer.open()
+  ├── bearerDidOpen(_:) → isConnectedToProxy = true → resume continuation
+  └── Poll proxyFilter.proxy != nil (up to 5s, 100ms interval)
+      └── Returns only after FilterStatus received → proxy filter ready
+
+Auto-reconnect:
+  bearer(_:didClose:) with no pending continuation + hasProvisionedNetwork
+  └── 1s delay → connectToProxy()
+```
+
+The 15-second total timeout on `connectToProxy()` covers the full scan-to-bearer-open time.
+
+---
+
+## Message Receive Dispatch
+
+`MeshNetworkDelegate.meshNetworkManager(_:didReceiveMessage:sentFrom:to:)` — `nonisolated`, posts all state updates to `@MainActor` via `Task { @MainActor in }`.
+
+### Config continuation resolution (first, before any guard)
+
+Matches `(source, message.opCode)` against `pendingConfigContinuations`. Resolves before the loopback guard so that local node config responses (source == provisioner address) are not suppressed.
+
+### Loopback suppression
+
+```swift
+guard source != manager.meshNetwork?.localProvisioner?.primaryUnicastAddress else { return }
+```
+
+Messages the app sent to 0xC001 loop back via the proxy (TTL-1, different bytes) and are discarded by lower transport as replays (same seqAuth). The few that do reach `didReceiveMessage` would otherwise apply to `currentGroup` twice. This guard prevents that for messages originating from the local node.
+
+### State update switch
+
+```swift
+switch message {
+case GenericOnOffSetUnacknowledged:  currentGroup.isOn = cmd.isOn
+case GenericOnOffStatus:             currentGroup.isOn = status.isOn
+case GenericLevelSet / Unacknowledged:
+    lightnessRaw = UInt16(Int32(cmd.level) + 32768)
+    currentGroup.lightness = Double(lightnessRaw) / 65535
+    // also updates isOn based on lightnessRaw == 0
+case GenericDeltaSetUnacknowledged:
+    // Relative delta — applied to current lightness
+    currentLevel = Int32(currentGroup.lightness * 65535) - 32768
+    newLevel = clamp(currentLevel + cmd.delta, -32768, 32767)
+    lightnessRaw = UInt16(newLevel + 32768)
+    currentGroup.lightness = Double(lightnessRaw) / 65535
+case GenericLevelStatus:             currentGroup.lightness = ...
+case LightLightnessSetUnacknowledged: currentGroup.lightness = ...
+case LightLightnessStatus:           currentGroup.lightness = ...
+case LightCTLSetUnacknowledged:      currentGroup.{lightness,temperature} = ...
+case LightCTLStatus:                 currentGroup.{lightness,temperature} = ...
+case LightCTLTemperatureRangeStatus: currentGroup.{temperatureRangeMin,Max} = ...
+case LightLightnessRangeStatus:      currentGroup.{lightnessRangeMin,Max} = ...
+}
+```
+
+### Level ↔ Lightness conversion
+
+BLE Mesh `GenericLevel` range is [-32768, 32767]. BLE Mesh `LightLightness` range is [0, 65535].
+
+```
+lightness_uint16 = UInt16(Int32(level) + 32768)
+lightness_double = Double(lightness_uint16) / 65535.0
+
+level = Int32(lightness_double * 65535) - 32768
+```
+
+---
+
+## Model Delegates
+
+### `LightControlClientDelegate`
+
+Assigned to local `GenericOnOffClient` and `LightCTLClient` models. Registers opcodes so the library decodes status responses as typed messages (enabling `manager.send()` continuations to resolve):
+
+```
+GenericOnOffStatus, LightCTLStatus, LightCTLTemperatureRangeStatus, LightLightnessRangeStatus,
+ConfigCompositionDataStatus, ConfigAppKeyStatus, ConfigModelAppStatus,
+ConfigModelSubscriptionStatus, ConfigModelPublicationStatus
+```
+
+`isSubscriptionSupported = false` — client models do not subscribe to groups.
+
+### `LightServerDelegate`
+
+Assigned to all 9 local server models. Registers opcodes so the library:
+1. Decodes incoming set/status messages as typed objects (enabling the switch dispatch in `didReceiveMessage`).
+2. Supports group subscriptions (`isSubscriptionSupported = true`).
+
+Registered opcodes:
+```
+GenericOnOffSetUnacknowledged, GenericOnOffStatus,
+GenericLevelSet, GenericLevelSetUnacknowledged, GenericDeltaSetUnacknowledged, GenericLevelStatus,
+LightLightnessSetUnacknowledged, LightLightnessStatus,
+LightCTLSetUnacknowledged, LightCTLStatus
+```
+
+`GenericLevelSet` (acknowledged) is handled by returning `GenericLevelStatus(level: cmd.level)` from `didReceiveAcknowledgedMessage` — required because some dimmers send the acknowledged variant and expect a response.
+
+---
+
+## State Query on Connect
+
+`fetchCurrentState()` is called after `connectToProxy()` in `DeviceControlViewModel.connectIfNeeded()`. It queries the first provisioned node using unicast addressing (not group addressing):
+
+1. `GenericOnOffGet` → `GenericOnOffStatus` → `currentGroup.isOn`
+2. `LightCTLGet` → `LightCTLStatus` → `currentGroup.{lightness, temperature}`
+3. `LightLightnessRangeGet` → `LightLightnessRangeStatus` → `currentGroup.{lightnessRangeMin, lightnessRangeMax}`
+4. `LightCTLTemperatureRangeGet` → `LightCTLTemperatureRangeStatus` → `currentGroup.{temperatureRangeMin, temperatureRangeMax}`
+
+Range values from the device clamp the UI sliders to what the hardware actually supports.
+
+---
+
+## Device Control Send Path
+
+### `setOnOff(on:)`
+
+Sends `GenericOnOffSetUnacknowledged` to `MeshAddress(0xC001)` using the app key. Updates `currentGroup.isOn` immediately after send (optimistic).
+
+### `setLightCTL(lightness:temperature:)`
+
+Sends `LightCTLSetUnacknowledged` to `MeshAddress(0xC001)`. Lightness is clamped to `[lightnessRangeMin, lightnessRangeMax]` (0 is a special case — sends 0 directly for off). Temperature is clamped to `[temperatureRangeMin, temperatureRangeMax]`. Transition time: 200ms.
+
+### ACK-gated send loop (`DeviceControlViewModel`)
+
+```
+setLightness(x) or setTemperature(x)
+  ├── Update currentGroup immediately (optimistic UI)
+  ├── Store in pendingLightness/pendingTemperature (overwrites previous)
+  └── triggerSendIfIdle()
+      └── if !isSending:
+          isSending = true
+          Task { sendLoop() }
+              └── while pending values exist:
+                  consume pendingLightness + pendingTemperature
+                  send LightCTLSetUnacknowledged
+                  sleep 100ms (bearer drain time)
+              isSending = false
+```
+
+Only the latest pending value is ever sent. Fast slider drags produce at most one in-flight send at a time with intermediate values discarded.
+
+---
+
+## Factory Reset
+
+`factoryResetAllNodes()`:
+1. Sends `ConfigNodeReset` to each node via `sendConfig()` (sequential, uses unicast addressing).
+2. 800ms delay.
+3. `resetMeshNetwork()`:
+   - Disconnects and nils `proxyBearer`, `manager.transmitter`.
+   - Stops BLE scan.
+   - Deletes `MeshNetwork.json`.
+   - Resets all `@Observable` state properties to initial values.
+   - Calls `setupMeshNetwork()` + `setupLocalElements()` to create a fresh network.
+
+---
+
+## Concurrency Model
+
+- `MeshNetworkService` is `@Observable @MainActor`. All state mutations happen on MainActor.
+- NordicMesh delegate callbacks (`nonisolated`) bridge to MainActor via `Task { @MainActor in }`.
+- `CBCentralManager` is created on `.main` queue. Its `nonisolated` delegate methods extract all non-`Sendable` values from `advertisementData` before crossing into the `Task` boundary.
+- `CheckedContinuation` / `CheckedThrowingContinuation` bridge async code to callback-based APIs (provisioning, proxy connection, config messages).
+- `OnceGate` (NSLock-based) ensures continuations used in race-between-operation-and-timeout are resumed exactly once.
+- `ProvisioningBearerBridge` holds a strong reference to itself as a bearer delegate (since `bearer.delegate` is `weak`) via `activeBearerDelegates[deviceID]`.
+
+---
+
+## Key Constants
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| Group address | `0xC001` | Fixed mesh group for all lighting control |
+| Silvair vendor model ID | `(0x0136 << 16) \| 0x0001` | Identifies switch elements for publication config |
+| CTL transition time | 200ms (2 × 100ms steps) | LightCTLSet smooth transition |
+| Proxy scan timeout | 15s | connectToProxy gives up after 15s |
+| Config message timeout | 8s | sendConfig per-message fallback timeout |
+| ProxyFilter ready poll | 5s (50 × 100ms) | Wait for FilterStatus after bearer open |
+| Bluetooth ready poll | 5s | Wait for CBManagerState.poweredOn |
+| Post-provisioning delay | 1s | Allow device to reboot into proxy mode |
+| Inter-device delay | 400ms | Breathing room between provisioning devices |
+| Send loop gap | 100ms | Minimum gap between CTL sends |
