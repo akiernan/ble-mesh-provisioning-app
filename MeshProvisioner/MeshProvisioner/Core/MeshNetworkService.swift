@@ -452,16 +452,8 @@ final class MeshNetworkService: NSObject {
 
         // Step 1: Generate / retrieve application key
         keyBindingStepStates[.generateKey] = .inProgress
-        let appKey: ApplicationKey
-        if let existing = network.applicationKeys.first {
-            appKey = existing
-        } else {
-            guard let netKey = network.networkKeys.first else {
-                throw AppError.keyBindingFailed("No network key found")
-            }
-            appKey = try network.add(applicationKey: Data.random128BitKey(),
-                                     withIndex: 0, name: "Light CTL App Key")
-            try appKey.bind(to: netKey)
+        guard let appKey = network.applicationKeys.first else {
+            throw AppError.keyBindingFailed("No application key found")
         }
         try await Task.sleep(for: .milliseconds(300))
         keyBindingStepStates[.generateKey] = .completed
