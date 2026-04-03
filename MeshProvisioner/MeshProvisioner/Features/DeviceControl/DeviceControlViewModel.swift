@@ -57,8 +57,10 @@ final class DeviceControlViewModel {
     }
 
     func setLightness(_ lightness: Double) {
-        // Update UI immediately
+        // Update UI immediately; mirror OnOff bound state
         meshService.currentGroup?.lightness = lightness
+        if lightness == 0 { meshService.currentGroup?.isOn = false }
+        else if meshService.currentGroup?.isOn == false { meshService.currentGroup?.isOn = true }
         guard let group = meshService.currentGroup else { return }
         pendingLightness = lightness
         pendingTemperature = group.temperature
