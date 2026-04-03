@@ -34,7 +34,7 @@ final class GroupConfigViewModel {
             let nodes = meshService.provisionedNodes
             _ = try await meshService.configureGroup(name: roomName, nodes: nodes)
 
-            // Ensure proxy is still connected for device control
+            // Ensure proxy is still connected for device control.
             try? await meshService.connectToProxy()
 
             router.navigate(to: .deviceControl)

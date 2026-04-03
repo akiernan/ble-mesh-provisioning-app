@@ -64,6 +64,7 @@ final class MeshNetworkService: NSObject {
     private let manager: MeshNetworkManager
     private var scannerCentralManager: CBCentralManager!
     private let clientDelegate = LightControlClientDelegate()
+    private let serverDelegate = LightServerDelegate()
 
     // Provisioning helpers – each device gets its own PBGattBearer (own central manager)
     private var activeProvisioningManagers: [UUID: ProvisioningManager] = [:]
@@ -104,10 +105,30 @@ final class MeshNetworkService: NSObject {
     private func setupLocalElements() {
         manager.localElements = [
             Element(name: "Primary Element", location: .unknown, models: [
+                // Client models for sending commands and receiving acknowledged responses.
                 Model(sigModelId: .genericOnOffClientModelId, delegate: clientDelegate),
                 Model(sigModelId: .lightCTLClientModelId, delegate: clientDelegate),
+                // All server models that bind transitively to the Light CTL Server.
+                // Subscribing these to the group causes the proxy filter to forward
+                // group-addressed messages to us, enabling real-time state updates
+                // from the external dimmer and switch.
+                Model(sigModelId: .genericOnOffServerModelId, delegate: serverDelegate),
+                Model(sigModelId: .genericLevelServerModelId, delegate: serverDelegate),
+                Model(sigModelId: .genericDefaultTransitionTimeServerModelId, delegate: serverDelegate),
+                Model(sigModelId: .genericPowerOnOffServerModelId, delegate: serverDelegate),
+                Model(sigModelId: .genericPowerOnOffSetupServerModelId, delegate: serverDelegate),
+                Model(sigModelId: .lightLightnessServerModelId, delegate: serverDelegate),
+                Model(sigModelId: .lightLightnessSetupServerModelId, delegate: serverDelegate),
+                Model(sigModelId: .lightCTLServerModelId, delegate: serverDelegate),
+                Model(sigModelId: .lightCTLSetupServerModelId, delegate: serverDelegate),
             ])
         ]
+        // Use a reject list with no rejected addresses (= accept everything) so that
+        // group-addressed messages are always forwarded by the GATT proxy, regardless
+        // of when local model subscriptions are added relative to the proxy connection.
+        // ProxyFilter.add(address:) is internal-only, so we cannot update the accept
+        // list mid-session after group config subscribes local models to 0xC001.
+        manager.proxyFilter.initialState = .rejectList(addresses: [])
     }
 
     // MARK: - Network Setup
@@ -606,9 +627,15 @@ final class MeshNetworkService: NSObject {
 
         groupConfigProgress = 0
         groupConfigStatus = "Starting…"
-        nodeGroupConfigStates = nodes.enumerated().map { idx, node in
+        let localNode = network.localProvisioner?.node
+        let localName = localNode?.name ?? "This Device"
+        var initialStates = nodes.enumerated().map { idx, node in
             NodeKeyBindingState(id: node.uuid, name: node.name ?? "Device \(idx + 1)", state: .pending)
         }
+        if let localNode {
+            initialStates.append(NodeKeyBindingState(id: localNode.uuid, name: localName, state: .pending))
+        }
+        nodeGroupConfigStates = initialStates
 
         for (nodeIndex, node) in nodes.enumerated() {
             let nodeName = node.name ?? "Device \(nodeIndex + 1)"
@@ -642,6 +669,40 @@ final class MeshNetworkService: NSObject {
                 }
             }
             if let idx = nodeGroupConfigStates.firstIndex(where: { $0.id == node.uuid }) {
+                nodeGroupConfigStates[idx].state = .completed
+            }
+        }
+
+        // Bind app key and subscribe local server models to the group so this device
+        // receives state updates (e.g. from the external switch) addressed to the group.
+        if let localNode {
+            let localId = localNode.uuid
+            if let idx = nodeGroupConfigStates.firstIndex(where: { $0.id == localId }) {
+                nodeGroupConfigStates[idx].state = .inProgress
+            }
+            let localServerIds: Set<UInt16> = [
+                .genericOnOffServerModelId,
+                .genericLevelServerModelId,
+                .genericDefaultTransitionTimeServerModelId,
+                .genericPowerOnOffServerModelId,
+                .genericPowerOnOffSetupServerModelId,
+                .lightLightnessServerModelId,
+                .lightLightnessSetupServerModelId,
+                .lightCTLServerModelId,
+                .lightCTLSetupServerModelId,
+            ]
+            groupConfigStatus = "Configuring \(localName)…"
+            for element in localNode.elements {
+                for model in element.models where localServerIds.contains(model.modelIdentifier) {
+                    if let msg = ConfigModelAppBind(applicationKey: appKey, to: model) {
+                        await sendConfig(msg, to: localNode)
+                    }
+                    if let msg = ConfigModelSubscriptionAdd(group: group, to: model) {
+                        await sendConfig(msg, to: localNode)
+                    }
+                }
+            }
+            if let idx = nodeGroupConfigStates.firstIndex(where: { $0.id == localId }) {
                 nodeGroupConfigStates[idx].state = .completed
             }
         }
@@ -768,12 +829,9 @@ final class MeshNetworkService: NSObject {
 
         guard let appKey = manager.meshNetwork?.applicationKeys.first else { return }
 
-        // Add the group address to the proxy filter so published status messages
-        // from the device are forwarded to this app over the GATT proxy.
-        if let groupAddress = currentGroup?.groupAddress {
-            manager.proxyFilter.add(address: groupAddress)
-            logger.info("🔄 Added group 0x\(String(groupAddress, radix: 16)) to proxy filter")
-        }
+        // Note: the proxy filter is configured as an empty reject list (= accept all) via
+        // manager.proxyFilter.initialState, so we must NOT call proxyFilter.add() here.
+        // Adding an address to a reject-list filter would BLOCK that address.
 
         // Bind the app key to local client models (persisted after first run)
         let localElement = manager.localElements.first
@@ -1035,29 +1093,81 @@ extension MeshNetworkService: MeshNetworkDelegate {
                                          didReceiveMessage message: MeshMessage,
                                          sentFrom source: Address,
                                          to destination: MeshAddress) {
-        // Ignore loopback — messages we sent to a group that echo back via the proxy filter
-        guard source != manager.meshNetwork?.localProvisioner?.primaryUnicastAddress else { return }
-        logger.info("📩 RECEIVED \(type(of: message)) opCode=0x\(String(message.opCode, radix: 16)) from 0x\(String(source, radix: 16)) to 0x\(String(destination.address, radix: 16))")
-
         // Resolve any config continuation waiting for this opCode from this node.
-        // Works even when the library delivers the response as UnknownMessage.
+        // Must happen before the loopback guard — local node config responses have
+        // source == provisioner address and would otherwise be silently dropped.
         let configKey = ConfigContinuationKey(sourceAddress: source, responseOpCode: message.opCode)
         Task { @MainActor in
             if let cont = pendingConfigContinuations.removeValue(forKey: configKey) {
                 cont.resume()
             }
         }
+
+        // Ignore loopback — messages we sent to a group that echo back via the proxy filter.
+        // Config responses are already handled above so this only suppresses state updates.
+        guard source != manager.meshNetwork?.localProvisioner?.primaryUnicastAddress else { return }
+        logger.info("📩 RECEIVED \(type(of: message)) opCode=0x\(String(message.opCode, radix: 16)) from 0x\(String(source, radix: 16)) to 0x\(String(destination.address, radix: 16))")
         if message is ConfigCompositionDataStatus {
             logger.info("📩 Got composition data response!")
         }
         if let status = message as? ConfigStatusMessage {
             logger.info("📩 Config status: \(status.isSuccess ? "success" : "failed"): \(status.message)")
         }
-        // Update group state from device status responses
+        // Update group state from incoming commands (switch) and status responses.
         Task { @MainActor in
+            if let cmd = message as? GenericOnOffSetUnacknowledged {
+                logger.info("🔄 OnOff command received: \(cmd.isOn ? "ON" : "OFF")")
+                self.currentGroup?.isOn = cmd.isOn
+            }
             if let status = message as? GenericOnOffStatus {
                 logger.info("🔄 OnOff state: \(status.isOn ? "ON" : "OFF")")
                 self.currentGroup?.isOn = status.isOn
+            }
+            // Absolute Generic Level (0x8206/0x8207): maps to lightness via Lightness = Level + 32768.
+            let levelValue: Int16? = (message as? GenericLevelSet)?.level
+                ?? (message as? GenericLevelSetUnacknowledged)?.level
+            if let level = levelValue {
+                let lightnessRaw = UInt16(Int32(level) + 32768)
+                let lightness = Double(lightnessRaw) / 65535.0
+                logger.info("🔄 Level command received: \(level) → lightness=\(Int(lightness * 100))%")
+                self.currentGroup?.lightness = lightness
+                if lightnessRaw == 0 { self.currentGroup?.isOn = false }
+                else if self.currentGroup?.isOn == false { self.currentGroup?.isOn = true }
+            }
+            // Delta Generic Level (0x820A): apply relative change to current level.
+            if let cmd = message as? GenericDeltaSetUnacknowledged {
+                let currentLevel = Int32((self.currentGroup?.lightness ?? 0.5) * 65535) - 32768
+                let newLevel = max(-32768, min(32767, currentLevel + cmd.delta))
+                let lightnessRaw = UInt16(newLevel + 32768)
+                let lightness = Double(lightnessRaw) / 65535.0
+                logger.info("🔄 Delta command received: Δ\(cmd.delta) → level=\(newLevel), lightness=\(Int(lightness * 100))%")
+                self.currentGroup?.lightness = lightness
+                if lightnessRaw == 0 { self.currentGroup?.isOn = false }
+                else if self.currentGroup?.isOn == false { self.currentGroup?.isOn = true }
+            }
+            if let status = message as? GenericLevelStatus {
+                let lightnessRaw = UInt16(Int32(status.level) + 32768)
+                let lightness = Double(lightnessRaw) / 65535.0
+                logger.info("🔄 Level status received: \(status.level) → lightness=\(Int(lightness * 100))%")
+                self.currentGroup?.lightness = lightness
+            }
+            if let cmd = message as? LightLightnessSetUnacknowledged {
+                let lightness = Double(cmd.lightness) / 65535.0
+                logger.info("🔄 Lightness command received: lightness=\(Int(lightness * 100))%")
+                self.currentGroup?.lightness = lightness
+                if cmd.lightness == 0 { self.currentGroup?.isOn = false }
+                else if self.currentGroup?.isOn == false { self.currentGroup?.isOn = true }
+            }
+            if let status = message as? LightLightnessStatus {
+                let lightness = Double(status.lightness) / 65535.0
+                logger.info("🔄 Lightness status received: lightness=\(Int(lightness * 100))%")
+                self.currentGroup?.lightness = lightness
+            }
+            if let cmd = message as? LightCTLSetUnacknowledged {
+                let lightness = Double(cmd.lightness) / 65535.0
+                logger.info("🔄 CTL command received: lightness=\(Int(lightness * 100))%, temp=\(cmd.temperature)K")
+                self.currentGroup?.lightness = lightness
+                self.currentGroup?.temperature = cmd.temperature
             }
             if let status = message as? LightCTLStatus {
                 let lightness = Double(status.lightness) / 65535.0
@@ -1221,3 +1331,54 @@ private class LightControlClientDelegate: ModelDelegate {
     }
 }
 
+// MARK: - LightServerDelegate
+
+/// Model delegate for local GenericOnOff Server and LightCTL Server models.
+/// Registering these opcodes allows the library to:
+///   1. Decode incoming Set/Status messages so MeshNetworkDelegate.didReceiveMessage
+///      receives typed messages rather than UnknownMessage.
+///   2. Subscribe the local models to the group address, which causes the proxy filter
+///      to include the group so the GATT proxy forwards those messages to us.
+private class LightServerDelegate: ModelDelegate {
+    let isSubscriptionSupported = true
+    let publicationMessageComposer: MessageComposer? = nil
+
+    let messageTypes: [UInt32: MeshMessage.Type] = [
+        GenericOnOffSetUnacknowledged.opCode: GenericOnOffSetUnacknowledged.self,
+        GenericOnOffStatus.opCode: GenericOnOffStatus.self,
+        GenericLevelSet.opCode: GenericLevelSet.self,
+        GenericLevelSetUnacknowledged.opCode: GenericLevelSetUnacknowledged.self,
+        GenericDeltaSetUnacknowledged.opCode: GenericDeltaSetUnacknowledged.self,
+        GenericLevelStatus.opCode: GenericLevelStatus.self,
+        LightLightnessSetUnacknowledged.opCode: LightLightnessSetUnacknowledged.self,
+        LightLightnessStatus.opCode: LightLightnessStatus.self,
+        LightCTLSetUnacknowledged.opCode: LightCTLSetUnacknowledged.self,
+        LightCTLStatus.opCode: LightCTLStatus.self,
+    ]
+
+    func model(_ model: Model,
+               didReceiveAcknowledgedMessage request: AcknowledgedMeshMessage,
+               from source: Address,
+               sentTo destination: MeshAddress) throws -> MeshResponse {
+        // GenericLevelSet (0x8206) is the acknowledged variant sent by some dimmers.
+        // Return the current level as a status response.
+        if let cmd = request as? GenericLevelSet {
+            return GenericLevelStatus(level: cmd.level)
+        }
+        fatalError("LightServerDelegate received unexpected acknowledged message: \(request)")
+    }
+
+    func model(_ model: Model,
+               didReceiveUnacknowledgedMessage message: UnacknowledgedMeshMessage,
+               from source: Address,
+               sentTo destination: MeshAddress) {
+        // State updates are handled centrally in MeshNetworkDelegate.didReceiveMessage.
+    }
+
+    func model(_ model: Model,
+               didReceiveResponse response: MeshResponse,
+               toAcknowledgedMessage request: AcknowledgedMeshMessage,
+               from source: Address) {
+        // Not applicable for server models.
+    }
+}
