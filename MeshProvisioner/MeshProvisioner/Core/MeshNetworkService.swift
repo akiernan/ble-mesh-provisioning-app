@@ -536,17 +536,68 @@ final class MeshNetworkService: NSObject {
             throw AppError.groupConfigFailed("No application key available")
         }
 
-        // No publication configured for any model — nodes only respond to commands,
-        // they do not proactively publish status.
+        // Models that bind transitively to Light CTL Server / Light Lightness Server.
+        // These live in the primary lighting element and should all subscribe to the group.
+        let ctlLightnessBindingIds: Set<UInt16> = [
+            .genericOnOffServerModelId,                 // 0x1000
+            .genericLevelServerModelId,                 // 0x1002
+            .genericDefaultTransitionTimeServerModelId, // 0x1004
+            .genericPowerOnOffServerModelId,            // 0x1006
+            .genericPowerOnOffSetupServerModelId,       // 0x1007
+            .lightLightnessServerModelId,               // 0x1300
+            .lightLightnessSetupServerModelId,          // 0x1301
+            .lightCTLServerModelId,                     // 0x1303
+            .lightCTLSetupServerModelId,                // 0x1304
+        ]
 
-        // Count total BLE operations upfront for progress reporting
+        // Models that bind transitively to Light CTL Temperature Server.
+        // These live in the secondary CTL temperature element.
+        let ctlTempBindingIds: Set<UInt16> = [
+            .genericLevelServerModelId,                 // 0x1002
+            .genericDefaultTransitionTimeServerModelId, // 0x1004
+            .lightCTLTemperatureServerModelId,          // 0x1306
+        ]
+
+        // Silvair vendor model (CID 0x0136, ModelID 0x0001) identifies a switch element.
+        // OnOff Client and Level Client in that element should publish to the group.
+        let silvairVendorModelId: UInt32 = (UInt32(0x0136) << 16) | UInt32(0x0001)
+        let switchClientIds: Set<UInt16> = [
+            .genericOnOffClientModelId, // 0x1001
+            .genericLevelClientModelId, // 0x1003
+        ]
+
+        let switchPublication = Publish(
+            to: MeshAddress(groupAddress),
+            using: appKey,
+            usingFriendshipMaterial: false,
+            ttl: 5,
+            period: .disabled,
+            retransmit: .disabled
+        )
+
+        // Helper: returns the subscription ID set appropriate for an element, or nil if
+        // the element doesn't contain any of our target lighting servers.
+        func subscribeIds(for element: Element) -> Set<UInt16>? {
+            let ids = Set(element.models.map { $0.modelIdentifier })
+            if ids.contains(.lightCTLServerModelId) || ids.contains(.lightLightnessServerModelId) {
+                return ctlLightnessBindingIds
+            } else if ids.contains(.lightCTLTemperatureServerModelId) {
+                return ctlTempBindingIds
+            }
+            return nil
+        }
+
+        // Count total BLE operations upfront for progress reporting.
         var totalOps = 0
         for node in nodes {
             for element in node.elements {
+                let subIds = subscribeIds(for: element)
+                let hasSilvair = element.models.contains(where: { $0.modelId == silvairVendorModelId })
                 for model in element.models {
-                    let mid = model.modelId
-                    guard mid != 0x0000 && mid != 0x0001 else { continue }
-                    if ConfigModelSubscriptionAdd(group: group, to: model) != nil { totalOps += 1 }
+                    if subIds?.contains(model.modelIdentifier) == true,
+                       ConfigModelSubscriptionAdd(group: group, to: model) != nil { totalOps += 1 }
+                    if hasSilvair && switchClientIds.contains(model.modelIdentifier),
+                       ConfigModelPublicationSet(switchPublication, to: model) != nil { totalOps += 1 }
                 }
             }
         }
@@ -559,20 +610,30 @@ final class MeshNetworkService: NSObject {
             NodeKeyBindingState(id: node.uuid, name: node.name ?? "Device \(idx + 1)", state: .pending)
         }
 
-        // Subscribe each node's non-config models to the group, and configure
-        // publishing for status-reporting models.
         for (nodeIndex, node) in nodes.enumerated() {
             let nodeName = node.name ?? "Device \(nodeIndex + 1)"
             if let idx = nodeGroupConfigStates.firstIndex(where: { $0.id == node.uuid }) {
                 nodeGroupConfigStates[idx].state = .inProgress
             }
             for element in node.elements {
+                let subIds = subscribeIds(for: element)
+                let hasSilvair = element.models.contains(where: { $0.modelId == silvairVendorModelId })
                 for model in element.models {
-                    let modelId = model.modelId
-                    guard modelId != 0x0000 && modelId != 0x0001 else { continue }
-                    if let msg = ConfigModelSubscriptionAdd(group: group, to: model) {
+                    // Subscribe lighting models to the group
+                    if subIds?.contains(model.modelIdentifier) == true,
+                       let msg = ConfigModelSubscriptionAdd(group: group, to: model) {
                         groupConfigStatus = "Subscribing \(nodeName) to group…"
-                        logger.info("🔧 Subscribing model 0x\(String(modelId, radix: 16)) to group \(name)")
+                        logger.info("🔧 Subscribing model 0x\(String(model.modelId, radix: 16)) to group \(name)")
+                        await sendConfig(msg, to: node)
+                        try? await Task.sleep(for: .milliseconds(200))
+                        completedOps += 1
+                        groupConfigProgress = Double(completedOps) / Double(totalOps)
+                    }
+                    // Configure switch clients (Silvair element) to publish to the group
+                    if hasSilvair && switchClientIds.contains(model.modelIdentifier),
+                       let msg = ConfigModelPublicationSet(switchPublication, to: model) {
+                        groupConfigStatus = "Configuring switch publish on \(nodeName)…"
+                        logger.info("🔧 Configuring switch client 0x\(String(model.modelId, radix: 16)) → 0xC001")
                         await sendConfig(msg, to: node)
                         try? await Task.sleep(for: .milliseconds(200))
                         completedOps += 1
