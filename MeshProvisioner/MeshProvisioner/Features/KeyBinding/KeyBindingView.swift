@@ -20,8 +20,9 @@ struct KeyBindingView: View {
                 vm.startKeyBinding()
             }
         }
-        .navigationBarBackButtonHidden(true)
-        .navigationTitle("")
+        .navigationBarBackButtonHidden(viewModel?.isRunning ?? true)
+        .navigationTitle("Key Binding")
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     private func content(vm: KeyBindingViewModel) -> some View {
@@ -103,15 +104,6 @@ struct KeyBindingView: View {
                 // Security info card
                 securityCard
 
-                if let error = vm.errorMessage {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .padding()
-                        .background(Color.red.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-
                 if vm.allCompleted {
                     completionBadge
                 }
@@ -121,6 +113,14 @@ struct KeyBindingView: View {
         }
         .sensoryFeedback(.success, trigger: vm.allCompleted)
         .sensoryFeedback(.error, trigger: vm.errorMessage)
+        .alert("Key Binding Failed", isPresented: Binding(
+            get: { vm.errorMessage != nil },
+            set: { if !$0 { vm.errorMessage = nil } }
+        )) {
+            Button("OK") { vm.errorMessage = nil }
+        } message: {
+            Text(vm.errorMessage ?? "")
+        }
     }
 
     private var securityCard: some View {
@@ -167,6 +167,7 @@ struct KeyBindingView: View {
 
 private struct NodeKeyBindingRow: View {
     let nodeState: NodeKeyBindingState
+    @ScaledMetric private var iconSize: CGFloat = 24
 
     var body: some View {
         HStack(spacing: 10) {
@@ -192,9 +193,9 @@ private struct NodeKeyBindingRow: View {
         ZStack {
             Circle()
                 .fill(iconColor)
-                .frame(width: 24, height: 24)
+                .frame(width: iconSize, height: iconSize)
             Image(systemName: iconName)
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: iconSize * 0.42, weight: .semibold))
                 .foregroundStyle(.white)
         }
     }
@@ -257,6 +258,7 @@ private struct NodeKeyBindingRow: View {
 private struct KeyBindingStepRow: View {
     let step: KeyBindingStep
     let state: KeyBindingStepState
+    @ScaledMetric private var iconSize: CGFloat = 44
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
@@ -294,11 +296,10 @@ private struct KeyBindingStepRow: View {
         ZStack {
             Circle()
                 .fill(iconBackground)
-                .frame(width: 44, height: 44)
+                .frame(width: iconSize, height: iconSize)
             Image(systemName: iconName)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: iconSize * 0.36, weight: .semibold))
                 .foregroundStyle(.white)
-                
         }
     }
 

@@ -18,8 +18,9 @@ struct GroupConfigView: View {
                 viewModel = GroupConfigViewModel(meshService: meshService, router: router)
             }
         }
-        .navigationBarBackButtonHidden(true)
-        .navigationTitle("")
+        .navigationBarBackButtonHidden(viewModel?.isConfiguring ?? false)
+        .navigationTitle("Group Configuration")
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     @ViewBuilder
@@ -55,19 +56,19 @@ struct GroupConfigView: View {
                     setupView(vm: vm)
                 }
 
-                if let error = vm.errorMessage {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .padding()
-                        .background(Color.red.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 40)
         }
         .sensoryFeedback(.error, trigger: vm.errorMessage)
+        .alert("Group Configuration Failed", isPresented: Binding(
+            get: { vm.errorMessage != nil },
+            set: { if !$0 { vm.errorMessage = nil } }
+        )) {
+            Button("OK") { vm.errorMessage = nil }
+        } message: {
+            Text(vm.errorMessage ?? "")
+        }
     }
 
     // MARK: - Setup form
@@ -119,7 +120,7 @@ struct GroupConfigView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Quick Select")
                     .font(.headline)
-                LazyVGrid(columns: Array(repeating: .init(.flexible()), count: 3), spacing: 8) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 8)], spacing: 8) {
                     ForEach(vm.suggestedRooms, id: \.self) { room in
                         Button {
                             vm.roomName = room
@@ -225,6 +226,7 @@ struct GroupConfigView: View {
 
 private struct NodeGroupConfigRow: View {
     let nodeState: NodeKeyBindingState
+    @ScaledMetric private var iconSize: CGFloat = 24
 
     var body: some View {
         HStack(spacing: 10) {
@@ -250,9 +252,9 @@ private struct NodeGroupConfigRow: View {
         ZStack {
             Circle()
                 .fill(iconColor)
-                .frame(width: 24, height: 24)
+                .frame(width: iconSize, height: iconSize)
             Image(systemName: iconName)
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: iconSize * 0.42, weight: .semibold))
                 .foregroundStyle(.white)
         }
     }

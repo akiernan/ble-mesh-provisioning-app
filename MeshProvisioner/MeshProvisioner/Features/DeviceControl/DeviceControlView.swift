@@ -24,7 +24,9 @@ struct DeviceControlView: View {
             }
         }
         .navigationBarBackButtonHidden(true)
-        .navigationTitle("")
+        .navigationTitle(viewModel?.group?.name ?? "Lights")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
         .overlay {
             if let vm = viewModel, vm.isResetting {
                 resetProgressOverlay(vm: vm)
@@ -63,20 +65,19 @@ struct DeviceControlView: View {
 
                     // Mesh info card
                     meshInfoCard(vm: vm)
-
-                    if let error = vm.errorMessage {
-                        Text(error)
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                            .padding()
-                            .background(Color.red.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
                 }
                 .padding(24)
             }
         }
         .sensoryFeedback(.error, trigger: vm.errorMessage)
+        .alert("Error", isPresented: Binding(
+            get: { vm.errorMessage != nil },
+            set: { if !$0 { vm.errorMessage = nil } }
+        )) {
+            Button("OK") { vm.errorMessage = nil }
+        } message: {
+            Text(vm.errorMessage ?? "")
+        }
     }
 
     // MARK: - Header
@@ -162,20 +163,7 @@ struct DeviceControlView: View {
                         .font(.title3.bold())
                         .monospacedDigit()
                 }
-                Slider(
-                    value: Binding(
-                        get: { group.lightness },
-                        set: { vm.setLightness($0) }
-                    ),
-                    in: 0...1,
-                    step: 0.01
-                )
-                .tint(
-                    LinearGradient(colors: [.blue, .cyan],
-                                   startPoint: .leading, endPoint: .trailing)
-                )
-                .accessibilityLabel("Brightness")
-                .accessibilityValue("\(Int(group.lightness * 100)) percent")
+                brightnessSlider(vm: vm, group: group)
                 HStack {
                     Text("0%").font(.caption).foregroundStyle(.secondary)
                     Spacer()
@@ -217,9 +205,45 @@ struct DeviceControlView: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
+    private func brightnessSlider(vm: DeviceControlViewModel, group: MeshGroupConfig) -> some View {
+        let thumbDiameter: CGFloat = 28
+        let thumbRadius = thumbDiameter / 2
+        return ZStack {
+            RoundedRectangle(cornerRadius: 4)
+                .fill(LinearGradient(
+                    colors: [Color(white: 0.12), Color(white: 0.55), Color(white: 1.0)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ))
+                .frame(height: 12)
+                .padding(.horizontal, 12)
+            Slider(
+                value: Binding(
+                    get: { group.lightness },
+                    set: { vm.setLightness($0) }
+                ),
+                in: 0...1,
+                step: 0.01
+            )
+            .tint(.clear)
+            .accessibilityLabel("Brightness")
+            .accessibilityValue("\(Int(group.lightness * 100)) percent")
+            GeometryReader { geo in
+                let x = thumbRadius + (geo.size.width - thumbDiameter) * group.lightness
+                Circle()
+                    .stroke(Color.primary.opacity(0.25), lineWidth: 1.5)
+                    .frame(width: thumbDiameter, height: thumbDiameter)
+                    .position(x: x, y: geo.size.height / 2)
+            }
+        }
+        .frame(height: 32)
+    }
+
     private func temperatureSlider(vm: DeviceControlViewModel, group: MeshGroupConfig) -> some View {
         let minTemp = Double(group.temperatureRangeMin)
         let maxTemp = Double(group.temperatureRangeMax)
+        let thumbDiameter: CGFloat = 28
+        let thumbRadius = thumbDiameter / 2
         return ZStack {
             // Gradient track
             RoundedRectangle(cornerRadius: 4)
@@ -227,7 +251,7 @@ struct DeviceControlView: View {
                     stops: [
                         .init(color: Color(red: 1.0, green: 0.55, blue: 0.26), location: 0),
                         .init(color: Color(red: 1.0, green: 0.85, blue: 0.0), location: 0.2),
-                        .init(color: .white, location: 0.5),
+                        .init(color: Color(white: 0.88), location: 0.5),
                         .init(color: Color(red: 0.7, green: 0.85, blue: 1.0), location: 0.75),
                         .init(color: Color(red: 0.29, green: 0.56, blue: 0.89), location: 1.0)
                     ],
@@ -247,6 +271,15 @@ struct DeviceControlView: View {
             .tint(.clear)
             .accessibilityLabel("Color temperature")
             .accessibilityValue("\(group.temperature) Kelvin, \(group.temperatureLabel())")
+            // Outline ring on the thumb so it stays visible at the near-white midpoint
+            GeometryReader { geo in
+                let fraction = (Double(group.temperature) - minTemp) / max(maxTemp - minTemp, 1)
+                let x = thumbRadius + (geo.size.width - thumbDiameter) * fraction
+                Circle()
+                    .stroke(Color.primary.opacity(0.25), lineWidth: 1.5)
+                    .frame(width: thumbDiameter, height: thumbDiameter)
+                    .position(x: x, y: geo.size.height / 2)
+            }
         }
         .frame(height: 32)
     }

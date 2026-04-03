@@ -20,8 +20,9 @@ struct ProvisioningView: View {
                 vm.startProvisioning()
             }
         }
-        .navigationBarBackButtonHidden(true)
-        .navigationTitle("")
+        .navigationBarBackButtonHidden(viewModel?.isRunning ?? true)
+        .navigationTitle("Provisioning")
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     private func content(vm: ProvisioningViewModel) -> some View {
@@ -96,20 +97,20 @@ struct ProvisioningView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
 
-                if let error = vm.errorMessage {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .padding()
-                        .background(Color.red.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 40)
         }
         .sensoryFeedback(.success, trigger: vm.completedCount == vm.devices.count && !vm.devices.isEmpty)
         .sensoryFeedback(.error, trigger: vm.errorMessage)
+        .alert("Provisioning Failed", isPresented: Binding(
+            get: { vm.errorMessage != nil },
+            set: { if !$0 { vm.errorMessage = nil } }
+        )) {
+            Button("OK") { vm.errorMessage = nil }
+        } message: {
+            Text(vm.errorMessage ?? "")
+        }
     }
 }
 
@@ -118,6 +119,7 @@ struct ProvisioningView: View {
 private struct ProvisioningDeviceRow: View {
     let device: DiscoveredDevice
     let state: ProvisioningDeviceState
+    @ScaledMetric private var iconSize: CGFloat = 44
 
     var body: some View {
         HStack(spacing: 16) {
@@ -165,9 +167,9 @@ private struct ProvisioningDeviceRow: View {
         ZStack {
             Circle()
                 .fill(iconBackground)
-                .frame(width: 44, height: 44)
+                .frame(width: iconSize, height: iconSize)
             Image(systemName: iconName)
-                .font(.system(size: 18, weight: .medium))
+                .font(.system(size: iconSize * 0.4, weight: .medium))
                 .foregroundStyle(.white)
                 
         }

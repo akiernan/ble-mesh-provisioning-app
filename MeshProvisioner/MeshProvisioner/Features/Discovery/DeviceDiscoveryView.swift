@@ -18,7 +18,8 @@ struct DeviceDiscoveryView: View {
                 viewModel = DeviceDiscoveryViewModel(meshService: meshService, router: router)
             }
         }
-        .navigationTitle("")
+        .navigationTitle("Discover Devices")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .navigationBar)
     }
 
@@ -156,6 +157,7 @@ private struct DeviceRow: View {
     let device: DiscoveredDevice
     let isSelected: Bool
     let onTap: () -> Void
+    @ScaledMetric private var checkmarkSize: CGFloat = 28
 
     var body: some View {
         Button(action: onTap) {
@@ -212,10 +214,10 @@ private struct DeviceRow: View {
         ZStack {
             Circle()
                 .fill(isSelected ? Color.blue : Color(.systemGray5))
-                .frame(width: 28, height: 28)
+                .frame(width: checkmarkSize, height: checkmarkSize)
             if isSelected {
                 Image(systemName: "checkmark")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.system(size: checkmarkSize * 0.46, weight: .bold))
                     .foregroundStyle(.white)
             }
         }
