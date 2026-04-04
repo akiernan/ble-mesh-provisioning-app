@@ -4,6 +4,7 @@ import SwiftUI
 struct MeshProvisionerApp: App {
     @State private var meshService = MeshNetworkService()
     @State private var router = AppRouter()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
@@ -27,6 +28,13 @@ struct MeshProvisionerApp: App {
             .onAppear {
                 if meshService.hasProvisionedNetwork {
                     router.navigate(to: .deviceControl)
+                }
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                guard newPhase == .active, meshService.hasProvisionedNetwork else { return }
+                Task {
+                    try? await meshService.connectToProxy()
+                    await meshService.fetchCurrentState()
                 }
             }
         }

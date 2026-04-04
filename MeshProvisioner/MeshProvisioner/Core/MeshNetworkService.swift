@@ -1101,11 +1101,12 @@ extension MeshNetworkService: BearerDelegate {
                     cont.resume(throwing: error ?? AppError.messageSendFailed(
                         "Proxy connection closed"))
                 } else if hasProvisionedNetwork {
-                    // Auto-reconnect if we have a provisioned network
+                    // Auto-reconnect if we have a provisioned network, then refresh state
                     logger.info("Auto-reconnecting to proxy...")
                     Task {
                         try? await Task.sleep(for: .seconds(1))
                         try? await connectToProxy()
+                        await fetchCurrentState()
                     }
                 }
             }
