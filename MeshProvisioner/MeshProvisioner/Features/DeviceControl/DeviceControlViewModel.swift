@@ -47,9 +47,11 @@ final class DeviceControlViewModel {
 
     func togglePower() {
         guard let group else { return }
+        let turningOn = !group.isOn
         Task {
             do {
-                try await meshService.setOnOff(!group.isOn)
+                try await meshService.setOnOff(turningOn)
+                if turningOn { await meshService.fetchCurrentState() }
             } catch {
                 errorMessage = error.localizedDescription
             }

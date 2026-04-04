@@ -55,9 +55,10 @@ struct DeviceControlView: View {
 
                     // Sliders (only active when on)
                     if let group = vm.group {
+                        let slidersActive = group.isOn && group.lightness > 0
                         slidersSection(vm: vm, group: group)
-                            .opacity(group.isOn ? 1 : 0.4)
-                            .disabled(!group.isOn)
+                            .opacity(slidersActive ? 1 : 0.4)
+                            .disabled(!slidersActive)
                     }
 
                     // Individual devices
@@ -162,6 +163,7 @@ struct DeviceControlView: View {
                     Text("\(Int(group.lightness * 100))%")
                         .font(.title3.bold())
                         .monospacedDigit()
+                        .opacity(group.isOn && group.lightness > 0 ? 1 : 0)
                 }
                 brightnessSlider(vm: vm, group: group)
                 HStack {
@@ -228,12 +230,14 @@ struct DeviceControlView: View {
             .tint(.clear)
             .accessibilityLabel("Brightness")
             .accessibilityValue("\(Int(group.lightness * 100)) percent")
-            GeometryReader { geo in
-                let x = thumbRadius + (geo.size.width - thumbDiameter) * group.lightness
-                Circle()
-                    .stroke(Color.primary.opacity(0.25), lineWidth: 1.5)
-                    .frame(width: thumbDiameter, height: thumbDiameter)
-                    .position(x: x, y: geo.size.height / 2)
+            if group.isOn && group.lightness > 0 {
+                GeometryReader { geo in
+                    let x = thumbRadius + (geo.size.width - thumbDiameter) * group.lightness
+                    Circle()
+                        .stroke(Color.primary.opacity(0.25), lineWidth: 1.5)
+                        .frame(width: thumbDiameter, height: thumbDiameter)
+                        .position(x: x, y: geo.size.height / 2)
+                }
             }
         }
         .frame(height: 32)
