@@ -46,24 +46,29 @@ struct EnOceanProxyConfigGet: StaticUnacknowledgedVendorMessage {
 
 extension MeshNetworkService {
 
-    /// Sends ENOCEAN_PROXY_CONFIGURATION_SET to the main group (0xC001)
-    /// so all Silvair nodes register the PTM216B switch's credentials.
+    /// Sends ENOCEAN_PROXY_CONFIGURATION_SET to the single node that hosts
+    /// the Silvair EnOcean Switch Mesh Proxy Server vendor model.
     ///
-    /// The message is sent three times at 50 ms intervals to improve
-    /// delivery reliability over the mesh (mirrors the switch's own pattern).
+    /// Only one node needs this config — it receives PTM216B BLE advertisements
+    /// and translates them into mesh messages for the rest of the network.
+    /// We prefer the node with the Silvair vendor model (Company 0x0136, Model 0x0001);
+    /// if composition data doesn't reveal it, we fall back to the first provisioned node.
+    ///
+    /// The message is sent three times at 50 ms intervals to improve delivery
+    /// reliability (mirrors the switch's own burst pattern).
     func configureEnOceanSwitch(_ config: EnOceanSwitchConfig) async throws {
         guard let appKey = manager.meshNetwork?.applicationKeys.first else {
             throw AppError.messageSendFailed("No application key configured")
         }
-        guard let group = currentGroup else {
-            throw AppError.messageSendFailed("No group configured")
+        guard let targetNode = enOceanProxyNode else {
+            throw AppError.messageSendFailed("No provisioned node to configure")
         }
         try await connectToProxy()
 
-        let dest = MeshAddress(group.groupAddress)
+        let dest = MeshAddress(targetNode.primaryUnicastAddress)
         let message = EnOceanProxyConfigSet(config: config)
 
-        logger.info("📡 Sending ENOCEAN_PROXY_CONFIGURATION_SET for \(config.addressString)")
+        logger.info("📡 Sending ENOCEAN_PROXY_CONFIGURATION_SET for \(config.addressString) to node 0x\(String(targetNode.primaryUnicastAddress, radix: 16))")
         for i in 0..<3 {
             try? await manager.send(message, to: dest, using: appKey)
             if i < 2 {
@@ -71,6 +76,22 @@ extension MeshNetworkService {
             }
         }
         logger.info("📡 EnOcean switch config sent")
+    }
+
+    /// The node that runs the Silvair EnOcean Switch Mesh Proxy Server.
+    /// Prefers the node whose composition data includes the Silvair vendor model
+    /// (Company ID 0x0136, Model ID 0x0001); falls back to the first provisioned node.
+    var enOceanProxyNode: Node? {
+        let silvairCompanyId: UInt16 = 0x0136
+        let silvairModelId:   UInt16 = 0x0001
+        return provisionedNodes.first {
+            $0.elements.contains { element in
+                element.models.contains { model in
+                    model.companyIdentifier == silvairCompanyId &&
+                    model.modelIdentifier   == silvairModelId
+                }
+            }
+        } ?? provisionedNodes.first
     }
 }
 
