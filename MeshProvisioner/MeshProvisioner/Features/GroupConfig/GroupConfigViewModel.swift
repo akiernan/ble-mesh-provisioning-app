@@ -37,7 +37,7 @@ final class GroupConfigViewModel {
             // Ensure proxy is still connected for device control.
             try? await meshService.connectToProxy()
 
-            router.navigate(to: .deviceControl)
+            router.navigate(to: .switchCommissioning)
         } catch {
             errorMessage = error.localizedDescription
             isConfiguring = false

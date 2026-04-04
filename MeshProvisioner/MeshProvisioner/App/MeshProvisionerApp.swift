@@ -18,6 +18,8 @@ struct MeshProvisionerApp: App {
                             KeyBindingView()
                         case .groupConfig:
                             GroupConfigView()
+                        case .switchCommissioning:
+                            SwitchCommissioningView()
                         case .deviceControl:
                             DeviceControlView()
                         }

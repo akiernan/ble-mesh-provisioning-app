@@ -288,7 +288,11 @@ extension MeshNetworkService: MeshNetworkDelegate {
                 }
 
             default:
-                logger.warning("📩 Unhandled message type: \(type(of: message)) opCode=0x\(String(message.opCode, radix: 16))")
+                if message.opCode == 0xF43601, let vendor = message as? UnknownMessage {
+                    self.handleEnOceanStatus(vendor, from: source)
+                } else {
+                    logger.warning("📩 Unhandled message type: \(type(of: message)) opCode=0x\(String(message.opCode, radix: 16))")
+                }
             }
         }
     }

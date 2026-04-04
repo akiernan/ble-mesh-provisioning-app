@@ -7,6 +7,7 @@ enum AppRoute: Hashable {
     case provisioning
     case keyBinding
     case groupConfig
+    case switchCommissioning
     case deviceControl
 }
 
