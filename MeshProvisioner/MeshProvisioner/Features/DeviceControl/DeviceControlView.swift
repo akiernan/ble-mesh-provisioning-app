@@ -63,12 +63,10 @@ struct DeviceControlView: View {
 
                     // Individual devices
                     devicesSection(vm: vm)
-
-                    // Mesh info card
-                    meshInfoCard(vm: vm)
                 }
                 .padding(24)
             }
+
         }
         .sensoryFeedback(.error, trigger: vm.errorMessage)
         .alert("Error", isPresented: Binding(
@@ -97,9 +95,17 @@ struct DeviceControlView: View {
                 Text(vm.group?.name ?? "Lights")
                     .font(.title2.bold())
                     .foregroundStyle(.white)
-                Text("\(vm.deviceCount) device\(vm.deviceCount == 1 ? "" : "s")")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.white.opacity(0.7))
+                let isActive = !meshService.isConnectedToProxy || meshService.isFetchingState
+                HStack(spacing: 6) {
+                    Text("\(vm.deviceCount) device\(vm.deviceCount == 1 ? "" : "s")")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.white.opacity(0.7))
+                    ProgressView()
+                        .tint(Color.white.opacity(0.7))
+                        .scaleEffect(0.7)
+                        .opacity(isActive ? 1 : 0)
+                }
+                .animation(.easeInOut(duration: 0.2), value: isActive)
             }
             Spacer()
             Button {
@@ -398,42 +404,6 @@ struct DeviceControlView: View {
         }
     }
 
-    // MARK: - Mesh info card
-
-    private func meshInfoCard(vm: DeviceControlViewModel) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(Color.blue)
-                    .frame(width: 28, height: 28)
-                Text("i")
-                    .font(.caption.bold())
-                    .foregroundStyle(.white)
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    Text(vm.isConnected ? "Mesh Network Active" : "Connecting…")
-                        .font(.headline)
-                        .foregroundStyle(.blue)
-                    if !vm.isConnected {
-                        ProgressView()
-                            .tint(.blue)
-                            .scaleEffect(0.75)
-                    }
-                }
-                Text("All devices in this group are connected via BLE mesh. Changes are broadcast to all devices simultaneously for synchronized control.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(16)
-        .background(Color.blue.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.blue.opacity(0.3), lineWidth: 1)
-        )
-    }
 }
 
 // MARK: - CTL Toggle Style

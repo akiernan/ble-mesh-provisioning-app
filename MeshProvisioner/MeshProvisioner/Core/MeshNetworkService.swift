@@ -33,6 +33,7 @@ final class MeshNetworkService: NSObject {
 
     var meshNetwork: MeshNetwork? { manager.meshNetwork }
     var isConnectedToProxy = false
+    var isFetchingState = false
     var currentGroup: MeshGroupConfig?
     var error: Error?
 

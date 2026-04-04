@@ -49,6 +49,8 @@ extension MeshNetworkService {
     func fetchCurrentState() async {
         guard let node = provisionedNodes.first else { return }
         guard let appKey = manager.meshNetwork?.applicationKeys.first else { return }
+        isFetchingState = true
+        defer { isFetchingState = false }
 
         // Note: the proxy filter is configured as an empty reject list (= accept all) via
         // manager.proxyFilter.initialState, so we must NOT call proxyFilter.add() here.
