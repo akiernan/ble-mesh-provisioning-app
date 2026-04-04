@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5A3B0F332F8177C100F6A744 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5A3B0F322F81768A00F6A744 /* Assets.xcassets */; };
 		5AF470892F812E5B00105C17 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 5AF470882F812E5B00105C17 /* AppIcon.icon */; };
 		AAAA00000000000000000011 /* NordicMesh in Frameworks */ = {isa = PBXBuildFile; productRef = AAAA00000000000000000010 /* NordicMesh */; };
 		AAAA00000000000000000101 /* MeshProvisionerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000100 /* MeshProvisionerApp.swift */; };
@@ -40,6 +41,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		5A3B0F322F81768A00F6A744 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		5AF470882F812E5B00105C17 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		AAAA0000000000000000000E /* MeshProvisioner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MeshProvisioner.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AAAA00000000000000000100 /* MeshProvisionerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshProvisionerApp.swift; sourceTree = "<group>"; };
@@ -90,6 +92,7 @@
 			isa = PBXGroup;
 			children = (
 				AAAA00000000000000000135 /* MeshProvisioner.entitlements */,
+				5A3B0F322F81768A00F6A744 /* Assets.xcassets */,
 				AAAA00000000000000000200 /* App */,
 				AAAA00000000000000000201 /* Core */,
 				AAAA00000000000000000202 /* Features */,
@@ -278,6 +281,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5A3B0F332F8177C100F6A744 /* Assets.xcassets in Resources */,
 				AAAA00000000000000000120 /* Localizable.xcstrings in Resources */,
 				5AF470892F812E5B00105C17 /* AppIcon.icon in Resources */,
 			);
