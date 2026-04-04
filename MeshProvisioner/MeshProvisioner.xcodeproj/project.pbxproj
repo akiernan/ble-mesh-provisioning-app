@@ -7,8 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5AF470892F812E5B00105C17 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 5AF470882F812E5B00105C17 /* AppIcon.icon */; };
 		AAAA00000000000000000011 /* NordicMesh in Frameworks */ = {isa = PBXBuildFile; productRef = AAAA00000000000000000010 /* NordicMesh */; };
-		AAAA00000000000000000120 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AAAA0000000000000000011F /* Localizable.xcstrings */; };
 		AAAA00000000000000000101 /* MeshProvisionerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000100 /* MeshProvisionerApp.swift */; };
 		AAAA00000000000000000103 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000102 /* AppRouter.swift */; };
 		AAAA00000000000000000105 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000104 /* Models.swift */; };
@@ -24,6 +24,7 @@
 		AAAA00000000000000000119 /* DeviceControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000118 /* DeviceControlView.swift */; };
 		AAAA0000000000000000011B /* DeviceControlViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA0000000000000000011A /* DeviceControlViewModel.swift */; };
 		AAAA0000000000000000011E /* GradientProgressStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA0000000000000000011D /* GradientProgressStyle.swift */; };
+		AAAA00000000000000000120 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AAAA0000000000000000011F /* Localizable.xcstrings */; };
 		AAAA00000000000000000122 /* MeshNetworkService+Scanning.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000121 /* MeshNetworkService+Scanning.swift */; };
 		AAAA00000000000000000124 /* MeshNetworkService+Provisioning.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000123 /* MeshNetworkService+Provisioning.swift */; };
 		AAAA00000000000000000126 /* MeshNetworkService+Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000125 /* MeshNetworkService+Configuration.swift */; };
@@ -32,6 +33,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		5AF470882F812E5B00105C17 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		AAAA0000000000000000000E /* MeshProvisioner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MeshProvisioner.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AAAA00000000000000000100 /* MeshProvisionerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshProvisionerApp.swift; sourceTree = "<group>"; };
 		AAAA00000000000000000102 /* AppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
@@ -173,6 +175,7 @@
 		AAAA00000000000000000208 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				5AF470882F812E5B00105C17 /* AppIcon.icon */,
 				AAAA0000000000000000011C /* Info.plist */,
 				AAAA0000000000000000011F /* Localizable.xcstrings */,
 			);
@@ -245,6 +248,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AAAA00000000000000000120 /* Localizable.xcstrings in Resources */,
+				5AF470892F812E5B00105C17 /* AppIcon.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
