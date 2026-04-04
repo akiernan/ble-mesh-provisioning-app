@@ -35,6 +35,8 @@
 		AAAA00000000000000000130 /* SwitchCommissioningViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA0000000000000000012F /* SwitchCommissioningViewModel.swift */; };
 		AAAA00000000000000000132 /* SwitchCommissioningView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000131 /* SwitchCommissioningView.swift */; };
 		AAAA00000000000000000134 /* MeshNetworkService+EnOceanSwitch.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000133 /* MeshNetworkService+EnOceanSwitch.swift */; };
+		AAAA00000000000000000137 /* EnOceanQRParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000136 /* EnOceanQRParser.swift */; };
+		AAAA00000000000000000139 /* QRScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000138 /* QRScannerView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -68,6 +70,8 @@
 		AAAA00000000000000000131 /* SwitchCommissioningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitchCommissioningView.swift; sourceTree = "<group>"; };
 		AAAA00000000000000000133 /* MeshNetworkService+EnOceanSwitch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MeshNetworkService+EnOceanSwitch.swift"; sourceTree = "<group>"; };
 		AAAA00000000000000000135 /* MeshProvisioner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MeshProvisioner.entitlements; sourceTree = "<group>"; };
+		AAAA00000000000000000136 /* EnOceanQRParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnOceanQRParser.swift; sourceTree = "<group>"; };
+		AAAA00000000000000000138 /* QRScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRScannerView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -141,17 +145,6 @@
 			path = Features;
 			sourceTree = "<group>";
 		};
-		AAAA00000000000000000209 /* SwitchCommissioning */ = {
-			isa = PBXGroup;
-			children = (
-				AAAA0000000000000000012B /* EnOceanSwitchConfig.swift */,
-				AAAA0000000000000000012D /* EnOceanNFCReader.swift */,
-				AAAA0000000000000000012F /* SwitchCommissioningViewModel.swift */,
-				AAAA00000000000000000131 /* SwitchCommissioningView.swift */,
-			);
-			path = SwitchCommissioning;
-			sourceTree = "<group>";
-		};
 		AAAA00000000000000000203 /* Discovery */ = {
 			isa = PBXGroup;
 			children = (
@@ -205,6 +198,19 @@
 				AAAA0000000000000000011F /* Localizable.xcstrings */,
 			);
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		AAAA00000000000000000209 /* SwitchCommissioning */ = {
+			isa = PBXGroup;
+			children = (
+				AAAA0000000000000000012B /* EnOceanSwitchConfig.swift */,
+				AAAA0000000000000000012D /* EnOceanNFCReader.swift */,
+				AAAA0000000000000000012F /* SwitchCommissioningViewModel.swift */,
+				AAAA00000000000000000131 /* SwitchCommissioningView.swift */,
+				AAAA00000000000000000136 /* EnOceanQRParser.swift */,
+				AAAA00000000000000000138 /* QRScannerView.swift */,
+			);
+			path = SwitchCommissioning;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -309,6 +315,8 @@
 				AAAA0000000000000000012E /* EnOceanNFCReader.swift in Sources */,
 				AAAA00000000000000000130 /* SwitchCommissioningViewModel.swift in Sources */,
 				AAAA00000000000000000132 /* SwitchCommissioningView.swift in Sources */,
+				AAAA00000000000000000137 /* EnOceanQRParser.swift in Sources */,
+				AAAA00000000000000000139 /* QRScannerView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

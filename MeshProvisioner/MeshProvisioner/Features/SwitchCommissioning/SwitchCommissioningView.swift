@@ -4,11 +4,24 @@ struct SwitchCommissioningView: View {
     @Environment(MeshNetworkService.self) private var meshService
     @Environment(AppRouter.self) private var router
     @State private var viewModel: SwitchCommissioningViewModel?
+    @State private var showQRScanner = false
 
     var body: some View {
         Group {
             if let vm = viewModel {
                 content(vm: vm)
+                    .fullScreenCover(isPresented: $showQRScanner) {
+                        QRScannerView(
+                            onResult: { string in
+                                showQRScanner = false
+                                vm.handleQRCode(string)
+                            },
+                            onCancel: {
+                                showQRScanner = false
+                            }
+                        )
+                        .ignoresSafeArea()
+                    }
             } else {
                 ProgressView()
             }
@@ -44,8 +57,8 @@ struct SwitchCommissioningView: View {
             switch vm.state {
             case .idle:
                 idleContent(vm: vm)
-            case .scanning:
-                scanningContent
+            case .scanningNFC:
+                scanningNFCContent
             case .configuring:
                 configuringContent
             case .success(let config):
@@ -71,8 +84,8 @@ struct SwitchCommissioningView: View {
                         endPoint: .bottomTrailing
                     ))
                     .frame(width: 140, height: 140)
-                Image(systemName: "wave.3.right.circle.fill")
-                    .font(.system(size: 64))
+                Image(systemName: "switch.2")
+                    .font(.system(size: 56))
                     .foregroundStyle(
                         LinearGradient(colors: [.blue, .teal], startPoint: .leading, endPoint: .trailing)
                     )
@@ -80,28 +93,42 @@ struct SwitchCommissioningView: View {
             VStack(spacing: 12) {
                 Text("Commission Switch")
                     .font(.largeTitle.bold())
-                Text("Hold your EnOcean switch near the top of your iPhone to register it with the mesh network.")
+                Text("Scan the QR code on the switch label, or hold the switch near your iPhone to read via NFC.")
                     .font(.body)
                     .foregroundStyle(.secondary)
             }
-            Button {
-                vm.startScan()
-            } label: {
-                Label("Scan Switch", systemImage: "wave.3.right")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(
-                        LinearGradient(colors: [.blue, .teal], startPoint: .leading, endPoint: .trailing)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+            VStack(spacing: 12) {
+                Button {
+                    showQRScanner = true
+                } label: {
+                    Label("Scan QR Code", systemImage: "qrcode.viewfinder")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            LinearGradient(colors: [.blue, .teal], startPoint: .leading, endPoint: .trailing)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .shadow(color: .blue.opacity(0.3), radius: 8, y: 4)
+
+                Button {
+                    vm.startNFCScan()
+                } label: {
+                    Label("Scan via NFC", systemImage: "wave.3.right")
+                        .font(.headline)
+                        .foregroundStyle(.blue)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(Color.blue.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
             }
-            .shadow(color: .blue.opacity(0.3), radius: 8, y: 4)
         }
     }
 
-    private var scanningContent: some View {
+    private var scanningNFCContent: some View {
         VStack(spacing: 24) {
             Image(systemName: "wave.3.right.circle.fill")
                 .font(.system(size: 64))

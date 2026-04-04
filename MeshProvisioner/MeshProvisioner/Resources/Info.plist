@@ -22,6 +22,8 @@
 	<true/>
 	<key>NFCReaderUsageDescription</key>
 	<string>Used to read your EnOcean switch credentials for mesh commissioning.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Used to scan the QR code on your EnOcean switch label for mesh commissioning.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>This app requires Bluetooth to discover, provision, and control BLE mesh lighting devices.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
