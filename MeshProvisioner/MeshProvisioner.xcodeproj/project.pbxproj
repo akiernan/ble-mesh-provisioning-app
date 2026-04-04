@@ -24,6 +24,11 @@
 		AAAA00000000000000000119 /* DeviceControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000118 /* DeviceControlView.swift */; };
 		AAAA0000000000000000011B /* DeviceControlViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA0000000000000000011A /* DeviceControlViewModel.swift */; };
 		AAAA0000000000000000011E /* GradientProgressStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA0000000000000000011D /* GradientProgressStyle.swift */; };
+		AAAA00000000000000000122 /* MeshNetworkService+Scanning.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000121 /* MeshNetworkService+Scanning.swift */; };
+		AAAA00000000000000000124 /* MeshNetworkService+Provisioning.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000123 /* MeshNetworkService+Provisioning.swift */; };
+		AAAA00000000000000000126 /* MeshNetworkService+Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000125 /* MeshNetworkService+Configuration.swift */; };
+		AAAA00000000000000000128 /* MeshNetworkService+Proxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000127 /* MeshNetworkService+Proxy.swift */; };
+		AAAA0000000000000000012A /* MeshNetworkService+LightControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000129 /* MeshNetworkService+LightControl.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -45,6 +50,11 @@
 		AAAA0000000000000000011C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AAAA0000000000000000011D /* GradientProgressStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GradientProgressStyle.swift; sourceTree = "<group>"; };
 		AAAA0000000000000000011F /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		AAAA00000000000000000121 /* MeshNetworkService+Scanning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MeshNetworkService+Scanning.swift"; sourceTree = "<group>"; };
+		AAAA00000000000000000123 /* MeshNetworkService+Provisioning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MeshNetworkService+Provisioning.swift"; sourceTree = "<group>"; };
+		AAAA00000000000000000125 /* MeshNetworkService+Configuration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MeshNetworkService+Configuration.swift"; sourceTree = "<group>"; };
+		AAAA00000000000000000127 /* MeshNetworkService+Proxy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MeshNetworkService+Proxy.swift"; sourceTree = "<group>"; };
+		AAAA00000000000000000129 /* MeshNetworkService+LightControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MeshNetworkService+LightControl.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -93,6 +103,11 @@
 			children = (
 				AAAA00000000000000000104 /* Models.swift */,
 				AAAA00000000000000000106 /* MeshNetworkService.swift */,
+				AAAA00000000000000000121 /* MeshNetworkService+Scanning.swift */,
+				AAAA00000000000000000123 /* MeshNetworkService+Provisioning.swift */,
+				AAAA00000000000000000125 /* MeshNetworkService+Configuration.swift */,
+				AAAA00000000000000000127 /* MeshNetworkService+Proxy.swift */,
+				AAAA00000000000000000129 /* MeshNetworkService+LightControl.swift */,
 				AAAA0000000000000000011D /* GradientProgressStyle.swift */,
 			);
 			path = Core;
@@ -255,6 +270,11 @@
 				AAAA00000000000000000119 /* DeviceControlView.swift in Sources */,
 				AAAA0000000000000000011B /* DeviceControlViewModel.swift in Sources */,
 				AAAA0000000000000000011E /* GradientProgressStyle.swift in Sources */,
+				AAAA00000000000000000122 /* MeshNetworkService+Scanning.swift in Sources */,
+				AAAA00000000000000000124 /* MeshNetworkService+Provisioning.swift in Sources */,
+				AAAA00000000000000000126 /* MeshNetworkService+Configuration.swift in Sources */,
+				AAAA00000000000000000128 /* MeshNetworkService+Proxy.swift in Sources */,
+				AAAA0000000000000000012A /* MeshNetworkService+LightControl.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
