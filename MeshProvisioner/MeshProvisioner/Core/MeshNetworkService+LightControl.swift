@@ -286,7 +286,7 @@ extension MeshNetworkService: MeshNetworkDelegate {
                 }
 
             default:
-                break
+                logger.warning("📩 Unhandled message type: \(type(of: message)) opCode=0x\(String(message.opCode, radix: 16))")
             }
         }
     }
