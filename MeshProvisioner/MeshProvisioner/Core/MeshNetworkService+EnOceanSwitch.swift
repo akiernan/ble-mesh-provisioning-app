@@ -79,19 +79,12 @@ extension MeshNetworkService {
     }
 
     /// The node that runs the Silvair EnOcean Switch Mesh Proxy Server.
-    /// Prefers the node whose composition data includes the Silvair vendor model
-    /// (Company ID 0x0136, Model ID 0x0001); falls back to the first provisioned node.
+    /// Uses the same node whose switch client publications were configured during
+    /// group setup (stored as `silvairSwitchNode`), guaranteeing that the
+    /// ENOCEAN_PROXY_CONFIGURATION_SET goes to the same node that will act on it.
+    /// Falls back to the first provisioned node if composition data was unavailable.
     var enOceanProxyNode: Node? {
-        let silvairCompanyId: UInt16 = 0x0136
-        let silvairModelId:   UInt16 = 0x0001
-        return provisionedNodes.first {
-            $0.elements.contains { element in
-                element.models.contains { model in
-                    model.companyIdentifier == silvairCompanyId &&
-                    model.modelIdentifier   == silvairModelId
-                }
-            }
-        } ?? provisionedNodes.first
+        silvairSwitchNode ?? provisionedNodes.first
     }
 }
 

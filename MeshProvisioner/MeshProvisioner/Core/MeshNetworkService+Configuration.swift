@@ -336,6 +336,7 @@ extension MeshNetworkService {
             for (elementIndex, element) in elements.enumerated() {
                 let target = subscribeTarget(for: element)
                 let hasSilvair = element.models.contains(where: { $0.modelId == silvairVendorModelId })
+                if hasSilvair { silvairSwitchNode = node }
                 for model in element.models {
                     // Subscribe lighting models to the appropriate group
                     if let t = target, t.ids.contains(model.modelIdentifier),

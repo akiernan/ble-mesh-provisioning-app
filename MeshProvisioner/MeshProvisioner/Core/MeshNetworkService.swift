@@ -61,6 +61,12 @@ final class MeshNetworkService: NSObject {
     var selectedDevicesForProvisioning: [DiscoveredDevice] = []
     var provisionedNodes: [Node] = []
 
+    /// The node identified as hosting the Silvair EnOcean Switch Mesh Proxy Server
+    /// (Company 0x0136, Model 0x0001). Set during group configuration when the node's
+    /// switch client publications are configured; used as the target for
+    /// ENOCEAN_PROXY_CONFIGURATION_SET so both operations go to the same node.
+    var silvairSwitchNode: Node?
+
     // MARK: Internal implementation state (accessed by extension files)
 
     let manager: MeshNetworkManager
@@ -196,6 +202,18 @@ final class MeshNetworkService: NSObject {
             lightness: 0.5,
             temperature: 4000
         )
+
+        // Restore the Silvair switch node (Company 0x0136, Model 0x0001)
+        let silvairCompanyId: UInt16 = 0x0136
+        let silvairModelId:   UInt16 = 0x0001
+        silvairSwitchNode = remoteNodes.first {
+            $0.elements.contains { element in
+                element.models.contains {
+                    $0.companyIdentifier == silvairCompanyId && $0.modelIdentifier == silvairModelId
+                }
+            }
+        }
+
         logger.info("Restored network: \(remoteNodes.count) node(s), group '\(group.name)'")
     }
 
@@ -247,6 +265,7 @@ final class MeshNetworkService: NSObject {
         discoveredDevices = []
         selectedDevicesForProvisioning = []
         provisionedNodes = []
+        silvairSwitchNode = nil
         currentGroup = nil
         provisioningStates = [:]
         keyBindingStepStates = Dictionary(uniqueKeysWithValues: KeyBindingStep.allCases.map { ($0, .pending) })
