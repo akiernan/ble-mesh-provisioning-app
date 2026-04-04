@@ -15,6 +15,12 @@ import Foundation
 // ENOCEAN_PROXY_CONFIGURATION_STATUS SubOpCode 0x03
 //   payload: SubOpCode(1) + Status(1) + optional SourceAddress(6) = 2-8 bytes
 
+// Silvair EnOcean Switch Mesh Proxy Server vendor model identifiers (used across multiple files)
+let kSilvairCompanyId:     UInt16 = 0x0136
+let kSilvairModelId:       UInt16 = 0x0001
+/// Combined 32-bit vendor model ID as stored by NordicMesh (companyId << 16 | modelId)
+let kSilvairVendorModelId: UInt32 = (UInt32(kSilvairCompanyId) << 16) | UInt32(kSilvairModelId)
+
 private let kSilvairVendorOpCode: UInt32 = 0xF43601
 private let kSubOpGet:    UInt8 = 0x00
 private let kSubOpSet:    UInt8 = 0x01

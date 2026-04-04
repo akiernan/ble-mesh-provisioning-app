@@ -223,8 +223,7 @@ extension MeshNetworkService {
             .lightCTLTemperatureServerModelId,          // 0x1306
         ]
 
-        // Silvair vendor model (CID 0x0136, ModelID 0x0001) identifies a switch element.
-        let silvairVendorModelId: UInt32 = (UInt32(0x0136) << 16) | UInt32(0x0001)
+        // Silvair vendor model identifies the switch element (see MeshNetworkService+EnOceanSwitch.swift)
         // OnOff + Level clients in the Silvair element publish to the main lighting group.
         let switchClientIds: Set<UInt16> = [
             .genericOnOffClientModelId, // 0x1001
@@ -282,7 +281,7 @@ extension MeshNetworkService {
             let elements = Array(node.elements)
             for (elementIndex, element) in elements.enumerated() {
                 let target = subscribeTarget(for: element)
-                let hasSilvair = element.models.contains(where: { $0.modelId == silvairVendorModelId })
+                let hasSilvair = element.models.contains(where: { $0.modelId == kSilvairVendorModelId })
                 for model in element.models {
                     if let t = target, t.ids.contains(model.modelIdentifier),
                        ConfigModelSubscriptionAdd(group: t.group, to: model) != nil { totalOps += 1 }
@@ -335,7 +334,7 @@ extension MeshNetworkService {
             let elements = Array(node.elements)
             for (elementIndex, element) in elements.enumerated() {
                 let target = subscribeTarget(for: element)
-                let hasSilvair = element.models.contains(where: { $0.modelId == silvairVendorModelId })
+                let hasSilvair = element.models.contains(where: { $0.modelId == kSilvairVendorModelId })
                 if hasSilvair { silvairSwitchNode = node }
                 for model in element.models {
                     // Subscribe lighting models to the appropriate group

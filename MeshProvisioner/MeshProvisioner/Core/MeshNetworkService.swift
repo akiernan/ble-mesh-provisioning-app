@@ -203,13 +203,11 @@ final class MeshNetworkService: NSObject {
             temperature: 4000
         )
 
-        // Restore the Silvair switch node (Company 0x0136, Model 0x0001)
-        let silvairCompanyId: UInt16 = 0x0136
-        let silvairModelId:   UInt16 = 0x0001
+        // Restore the Silvair switch node (see kSilvairCompanyId / kSilvairModelId)
         silvairSwitchNode = remoteNodes.first {
             $0.elements.contains { element in
                 element.models.contains {
-                    $0.companyIdentifier == silvairCompanyId && $0.modelIdentifier == silvairModelId
+                    $0.companyIdentifier == kSilvairCompanyId && $0.modelIdentifier == kSilvairModelId
                 }
             }
         }
