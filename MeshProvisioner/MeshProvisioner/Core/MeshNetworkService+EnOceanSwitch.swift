@@ -15,7 +15,7 @@ import Foundation
 // ENOCEAN_PROXY_CONFIGURATION_STATUS SubOpCode 0x03
 //   payload: SubOpCode(1) + Status(1) + optional SourceAddress(6) = 2-8 bytes
 
-private let kSilvaireVendorOpCode: UInt32 = 0xF43601
+private let kSilvairVendorOpCode: UInt32 = 0xF43601
 private let kSubOpGet:    UInt8 = 0x00
 private let kSubOpSet:    UInt8 = 0x01
 private let kSubOpStatus: UInt8 = 0x03
@@ -23,7 +23,7 @@ private let kSubOpStatus: UInt8 = 0x03
 // MARK: - Vendor Message Types
 
 struct EnOceanProxyConfigSet: StaticUnacknowledgedVendorMessage {
-    static let opCode: UInt32 = kSilvaireVendorOpCode
+    static let opCode: UInt32 = kSilvairVendorOpCode
     var parameters: Data?
 
     init(config: EnOceanSwitchConfig) {
@@ -37,7 +37,7 @@ struct EnOceanProxyConfigSet: StaticUnacknowledgedVendorMessage {
 }
 
 struct EnOceanProxyConfigGet: StaticUnacknowledgedVendorMessage {
-    static let opCode: UInt32 = kSilvaireVendorOpCode
+    static let opCode: UInt32 = kSilvairVendorOpCode
     var parameters: Data? = Data([kSubOpGet])
     init?(parameters: Data) { return nil }  // not used for receiving
 }
