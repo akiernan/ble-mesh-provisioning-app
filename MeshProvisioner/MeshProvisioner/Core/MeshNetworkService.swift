@@ -61,12 +61,6 @@ final class MeshNetworkService: NSObject {
     var selectedDevicesForProvisioning: [DiscoveredDevice] = []
     var provisionedNodes: [Node] = []
 
-    /// The node identified as hosting the Silvair EnOcean Switch Mesh Proxy Server
-    /// (Company 0x0136, Model 0x0001). Set during group configuration when the node's
-    /// switch client publications are configured; used as the target for
-    /// ENOCEAN_PROXY_CONFIGURATION_SET so both operations go to the same node.
-    var silvairSwitchNode: Node?
-
     // MARK: Internal implementation state (accessed by extension files)
 
     let manager: MeshNetworkManager
@@ -203,15 +197,6 @@ final class MeshNetworkService: NSObject {
             temperature: 4000
         )
 
-        // Restore the Silvair switch node (see kSilvairCompanyId / kSilvairModelId)
-        silvairSwitchNode = remoteNodes.first {
-            $0.elements.contains { element in
-                element.models.contains {
-                    $0.companyIdentifier == kSilvairCompanyId && $0.modelIdentifier == kSilvairModelId
-                }
-            }
-        }
-
         logger.info("Restored network: \(remoteNodes.count) node(s), group '\(group.name)'")
     }
 
@@ -263,7 +248,6 @@ final class MeshNetworkService: NSObject {
         discoveredDevices = []
         selectedDevicesForProvisioning = []
         provisionedNodes = []
-        silvairSwitchNode = nil
         currentGroup = nil
         provisioningStates = [:]
         keyBindingStepStates = Dictionary(uniqueKeysWithValues: KeyBindingStep.allCases.map { ($0, .pending) })
@@ -315,6 +299,10 @@ class LightControlClientDelegate: ModelDelegate {
             ConfigModelAppStatus.opCode: ConfigModelAppStatus.self,
             ConfigModelSubscriptionStatus.opCode: ConfigModelSubscriptionStatus.self,
             ConfigModelPublicationStatus.opCode: ConfigModelPublicationStatus.self,
+            // Silvair EnOcean vendor model — STATUS response (SubOpCode 0x03) shares
+            // the same opCode as SET/GET; registering it here lets the library decode
+            // it as EnOceanProxyConfigStatus so the acknowledged send() resolves.
+            EnOceanProxyConfigStatus.opCode: EnOceanProxyConfigStatus.self,
         ]
     }
 

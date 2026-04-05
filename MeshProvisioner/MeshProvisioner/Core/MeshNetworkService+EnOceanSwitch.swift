@@ -28,14 +28,28 @@ private let kSubOpStatus: UInt8 = 0x03
 
 // MARK: - Vendor Message Types
 
-struct EnOceanProxyConfigSet: StaticUnacknowledgedVendorMessage {
+/// ENOCEAN_PROXY_CONFIGURATION_STATUS — SubOpCode 0x03.
+/// Arrives as the acknowledged response to a SET or GET, and also as an
+/// unsolicited notification. Registered in LightControlClientDelegate so
+/// NordicMesh decodes it as a typed message instead of UnknownMessage.
+struct EnOceanProxyConfigStatus: StaticVendorResponse {
     static let opCode: UInt32 = kSilvairVendorOpCode
+    var parameters: Data?
+    init?(parameters: Data) { self.parameters = parameters }
+}
+
+/// ENOCEAN_PROXY_CONFIGURATION_SET — SubOpCode 0x01.
+/// Reliable (acknowledged) message; the node responds with
+/// EnOceanProxyConfigStatus (same opCode, SubOpCode 0x03).
+struct EnOceanProxyConfigSet: StaticAcknowledgedVendorMessage {
+    static let opCode: UInt32 = kSilvairVendorOpCode
+    static let responseType: StaticMeshResponse.Type = EnOceanProxyConfigStatus.self
     var parameters: Data?
 
     init(config: EnOceanSwitchConfig) {
         var data = Data([kSubOpSet])
-        data += config.securityKey   // 16 bytes
-        data += config.bdAddress     // 6 bytes
+        data += config.securityKey          // 16 bytes, MSB first (AES key, big-endian)
+        data += config.bdAddress.reversed() // 6 bytes, LSB first (BT wire format)
         parameters = data
     }
 
@@ -52,60 +66,66 @@ struct EnOceanProxyConfigGet: StaticUnacknowledgedVendorMessage {
 
 extension MeshNetworkService {
 
-    /// Sends ENOCEAN_PROXY_CONFIGURATION_SET to the single node that hosts
-    /// the Silvair EnOcean Switch Mesh Proxy Server vendor model.
+    /// Sends ENOCEAN_PROXY_CONFIGURATION_SET to the currently-connected GATT proxy node.
     ///
-    /// Only one node needs this config — it receives PTM216B BLE advertisements
-    /// and translates them into mesh messages for the rest of the network.
-    /// We prefer the node with the Silvair vendor model (Company 0x0136, Model 0x0001);
-    /// if composition data doesn't reveal it, we fall back to the first provisioned node.
+    /// Only one node needs the EnOcean proxy config — it scans for PTM216B BLE
+    /// advertisements and translates them into mesh messages. We use the node we're
+    /// currently proxied through because that's the one physically present during
+    /// commissioning, and therefore the one closest to the switch being installed.
     ///
-    /// The message is sent three times at 50 ms intervals to improve delivery
-    /// reliability (mirrors the switch's own burst pattern).
+    /// SET is a reliable (acknowledged) message — NordicMesh retransmits until
+    /// the node responds with a STATUS, or the library timeout fires.
     func configureEnOceanSwitch(_ config: EnOceanSwitchConfig) async throws {
         guard let appKey = manager.meshNetwork?.applicationKeys.first else {
             throw AppError.messageSendFailed("No application key configured")
         }
-        guard let targetNode = enOceanProxyNode else {
-            throw AppError.messageSendFailed("No provisioned node to configure")
-        }
         try await connectToProxy()
 
-        let dest = MeshAddress(targetNode.primaryUnicastAddress)
-        let message = EnOceanProxyConfigSet(config: config)
-
-        logger.info("📡 Sending ENOCEAN_PROXY_CONFIGURATION_SET for \(config.addressString) to node 0x\(String(targetNode.primaryUnicastAddress, radix: 16))")
-        for i in 0..<3 {
-            try? await manager.send(message, to: dest, using: appKey)
-            if i < 2 {
-                try? await Task.sleep(for: .milliseconds(50))
-            }
+        // Prefer the currently-connected proxy node if it has the Silvair vendor model;
+        // otherwise fall back to the first node that does.
+        let proxyNode = manager.proxyFilter.proxy
+        guard let targetNode = silvairNodes.first(where: { $0 === proxyNode }) ?? silvairNodes.first else {
+            throw AppError.messageSendFailed("No node with Silvair vendor model found")
         }
-        logger.info("📡 EnOcean switch config sent")
+        // The SET message must be addressed to the element that hosts the
+        // Silvair vendor model, not the node's primary element (element 0).
+        // In BLE Mesh, unicast messages are routed to the element with the
+        // matching address; element 0 does not have the vendor model.
+        guard let silvairElement = targetNode.elements.first(where: {
+            $0.models.contains { $0.companyIdentifier == kSilvairCompanyId && $0.modelIdentifier == kSilvairModelId }
+        }) else {
+            throw AppError.messageSendFailed("Proxy node 0x\(String(targetNode.primaryUnicastAddress, radix: 16)) has no Silvair element")
+        }
+        let elementAddress = silvairElement.unicastAddress
+        let dest = MeshAddress(elementAddress)
+        logger.info("📡 Sending ENOCEAN_PROXY_CONFIGURATION_SET for \(config.addressString) to element 0x\(String(elementAddress, radix: 16)) on node 0x\(String(targetNode.primaryUnicastAddress, radix: 16))")
+
+        let message = EnOceanProxyConfigSet(config: config)
+        try? await manager.send(message, to: dest, using: appKey)
+        // STATUS response arrives via the delegate (handleEnOceanStatus) — the library
+        // delivers vendor responses through MeshNetworkDelegate, not as a return value.
+        logger.info("📡 EnOcean switch config sent — awaiting STATUS via delegate")
     }
 
-    /// The node that runs the Silvair EnOcean Switch Mesh Proxy Server.
-    /// Uses the same node whose switch client publications were configured during
-    /// group setup (stored as `silvairSwitchNode`), guaranteeing that the
-    /// ENOCEAN_PROXY_CONFIGURATION_SET goes to the same node that will act on it.
-    /// Falls back to the first provisioned node if composition data was unavailable.
-    var enOceanProxyNode: Node? {
-        silvairSwitchNode ?? provisionedNodes.first
+    /// All provisioned nodes that host the Silvair EnOcean Switch Mesh Proxy Server
+    /// (Company 0x0136, Model 0x0001). Falls back to all provisioned nodes when
+    /// composition data hasn't been fetched yet (no node has the vendor model recorded).
+    var silvairNodes: [Node] {
+        let nodes = provisionedNodes.filter { node in
+            node.elements.contains { element in
+                element.models.contains {
+                    $0.companyIdentifier == kSilvairCompanyId && $0.modelIdentifier == kSilvairModelId
+                }
+            }
+        }
+        return nodes.isEmpty ? provisionedNodes : nodes
     }
 }
 
-// MARK: - LightServerDelegate opcode registration
-
-// The STATUS response (SubOpCode 0x03) arrives with opCode 0xF43601.
-// We register it in LightControlClientDelegate so the library decodes it
-// as a typed message rather than UnknownMessage — see MeshNetworkService.swift.
-//
-// The decoded message arrives in meshNetworkManager(_:didReceiveMessage:…) where
-// MeshNetworkService.handleEnOceanStatus(_:) is called if the opcode matches.
-
 extension MeshNetworkService {
-    /// Called from MeshNetworkDelegate when a vendor message with the Silvair opcode arrives.
-    func handleEnOceanStatus(_ message: UnknownMessage, from source: Address) {
+    /// Called from MeshNetworkDelegate when an EnOceanProxyConfigStatus arrives.
+    /// Handles both solicited responses (from a SET/GET) and unsolicited STATUS pushes.
+    func handleEnOceanStatus(_ message: EnOceanProxyConfigStatus, from source: Address) {
         guard let params = message.parameters, params.count >= 2,
               params[0] == kSubOpStatus else { return }
         let status = params[1]

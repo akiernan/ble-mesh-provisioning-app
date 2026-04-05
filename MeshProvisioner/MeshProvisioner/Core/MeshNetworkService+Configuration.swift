@@ -11,11 +11,13 @@ extension MeshNetworkService {
     /// This works around the library bug where `manager.send()` never resolves when
     /// the device's response arrives as `UnknownMessage`: we match on the raw opCode
     /// value directly in our delegate callback, which fires regardless of type.
-    func sendConfig(_ message: AcknowledgedConfigMessage, to node: Node) async {
+    @discardableResult
+    func sendConfig(_ message: AcknowledgedConfigMessage, to node: Node) async -> Bool {
         let key = ConfigContinuationKey(
             sourceAddress: node.primaryUnicastAddress,
             responseOpCode: message.responseOpCode
         )
+        var timedOut = false
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
             pendingConfigContinuations[key] = cont
             Task { [manager] in _ = try? await manager.send(message, to: node) }
@@ -23,11 +25,27 @@ extension MeshNetworkService {
                 try? await Task.sleep(for: .seconds(8))
                 guard let self else { return }
                 if let cont = pendingConfigContinuations.removeValue(forKey: key) {
+                    timedOut = true
                     logger.warning("🔧 Config send to 0x\(String(node.primaryUnicastAddress, radix: 16)) timed out")
                     cont.resume()
                 }
             }
         }
+        return !timedOut
+    }
+
+    /// Sends a config message, retrying up to `maxAttempts` times on timeout.
+    @discardableResult
+    func sendConfigRetrying(_ message: AcknowledgedConfigMessage, to node: Node, maxAttempts: Int = 3) async -> Bool {
+        for attempt in 1...maxAttempts {
+            let success = await sendConfig(message, to: node)
+            if success { return true }
+            if attempt < maxAttempts {
+                logger.warning("🔧 Retrying (attempt \(attempt + 1)/\(maxAttempts)) to 0x\(String(node.primaryUnicastAddress, radix: 16))…")
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+        }
+        return false
     }
 
     /// Runs an async operation with a timeout. If the timeout fires first, execution
@@ -275,6 +293,12 @@ extension MeshNetworkService {
             .lightCTLTemperatureServerModelId,
         ]
 
+        // Determine which node receives the EnOcean proxy configuration — the same
+        // selection logic as configureEnOceanSwitch. Only this node gets switch
+        // client publications (0xC001 / 0xC002); other Silvair nodes are left alone.
+        let proxyNode = manager.proxyFilter.proxy
+        let enOceanProxyNode = silvairNodes.first(where: { $0 === proxyNode }) ?? silvairNodes.first
+
         // Count total BLE operations upfront for progress reporting.
         var totalOps = 0
         for node in nodes {
@@ -285,11 +309,12 @@ extension MeshNetworkService {
                 for model in element.models {
                     if let t = target, t.ids.contains(model.modelIdentifier),
                        ConfigModelSubscriptionAdd(group: t.group, to: model) != nil { totalOps += 1 }
-                    if hasSilvair && switchClientIds.contains(model.modelIdentifier),
+                    if hasSilvair && node === enOceanProxyNode && switchClientIds.contains(model.modelIdentifier),
                        ConfigModelPublicationSet(mainSwitchPublication, to: model) != nil { totalOps += 1 }
                 }
-                // Level Client in element+1 after the Silvair element → CTL temp group
-                if hasSilvair && elementIndex + 1 < elements.count {
+                // element B (element+1 after Silvair element):
+                //   Level Client → CTL temp group (0xC002): right long-press = colour temp
+                if hasSilvair && node === enOceanProxyNode && elementIndex + 1 < elements.count {
                     let nextEl = elements[elementIndex + 1]
                     for model in nextEl.models where model.modelIdentifier == .genericLevelClientModelId {
                         if ConfigModelPublicationSet(ctlTempPublication, to: model) != nil { totalOps += 1 }
@@ -335,7 +360,6 @@ extension MeshNetworkService {
             for (elementIndex, element) in elements.enumerated() {
                 let target = subscribeTarget(for: element)
                 let hasSilvair = element.models.contains(where: { $0.modelId == kSilvairVendorModelId })
-                if hasSilvair { silvairSwitchNode = node }
                 for model in element.models {
                     // Subscribe lighting models to the appropriate group
                     if let t = target, t.ids.contains(model.modelIdentifier),
@@ -347,25 +371,27 @@ extension MeshNetworkService {
                         completedOps += 1
                         groupConfigProgress = Double(completedOps) / Double(totalOps)
                     }
-                    // Silvair main controller: OnOff + Level publish to main group
-                    if hasSilvair && switchClientIds.contains(model.modelIdentifier),
+                    // Silvair main controller: OnOff + Level publish to main group.
+                    // Only on the EnOcean proxy node — other nodes don't host the switch.
+                    if hasSilvair && node === enOceanProxyNode && switchClientIds.contains(model.modelIdentifier),
                        let msg = ConfigModelPublicationSet(mainSwitchPublication, to: model) {
                         groupConfigStatus = "Configuring switch publish on \(nodeName)…"
                         logger.info("🔧 Configuring switch client 0x\(String(model.modelId, radix: 16)) → 0xC001")
-                        await sendConfig(msg, to: node)
+                        await sendConfigRetrying(msg, to: node)
                         try? await Task.sleep(for: .milliseconds(200))
                         completedOps += 1
                         groupConfigProgress = Double(completedOps) / Double(totalOps)
                     }
                 }
-                // Silvair element+1: Level Client publishes to CTL temp group (OnOff ignored)
-                if hasSilvair && elementIndex + 1 < elements.count {
+                // element B (element+1 after Silvair element):
+                //   Level Client → CTL temp group (0xC002): right long-press = colour temp
+                if hasSilvair && node === enOceanProxyNode && elementIndex + 1 < elements.count {
                     let nextEl = elements[elementIndex + 1]
                     for model in nextEl.models where model.modelIdentifier == .genericLevelClientModelId {
                         if let msg = ConfigModelPublicationSet(ctlTempPublication, to: model) {
                             groupConfigStatus = "Configuring CTL temp switch on \(nodeName)…"
                             logger.info("🔧 Configuring CTL switch client 0x\(String(model.modelId, radix: 16)) → 0xC002")
-                            await sendConfig(msg, to: node)
+                            await sendConfigRetrying(msg, to: node)
                             try? await Task.sleep(for: .milliseconds(200))
                             completedOps += 1
                             groupConfigProgress = Double(completedOps) / Double(totalOps)
