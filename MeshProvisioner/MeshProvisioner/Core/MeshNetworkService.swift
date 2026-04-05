@@ -215,7 +215,7 @@ final class MeshNetworkService: NSObject {
         nodeResetCompleted = 0
         for node in nodes {
             logger.info("🔄 Sending ConfigNodeReset to \(node.name ?? "?")")
-            await sendConfig(ConfigNodeReset(), to: node)
+            await sendConfigRetrying(ConfigNodeReset(), to: node)
             nodeResetCompleted += 1
         }
         try? await Task.sleep(for: .milliseconds(800))
