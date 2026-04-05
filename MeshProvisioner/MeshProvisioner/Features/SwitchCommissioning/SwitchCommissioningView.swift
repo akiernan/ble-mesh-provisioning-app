@@ -1,3 +1,4 @@
+import CoreNFC
 import SwiftUI
 
 struct SwitchCommissioningView: View {
@@ -74,6 +75,8 @@ struct SwitchCommissioningView: View {
 
     // MARK: - States
 
+    private var nfcAvailable: Bool { NFCNDEFReaderSession.readingAvailable }
+
     private func idleContent(vm: SwitchCommissioningViewModel) -> some View {
         VStack(spacing: 32) {
             ZStack {
@@ -93,7 +96,9 @@ struct SwitchCommissioningView: View {
             VStack(spacing: 12) {
                 Text("Commission Switch")
                     .font(.largeTitle.bold())
-                Text("Scan the QR code on the switch label, or hold the switch near your iPhone to read via NFC.")
+                Text(nfcAvailable
+                    ? "Scan the QR code on the switch label, or hold the switch near your iPhone to read via NFC."
+                    : "Scan the QR code on the switch label.")
                     .font(.body)
                     .foregroundStyle(.secondary)
             }
@@ -113,16 +118,18 @@ struct SwitchCommissioningView: View {
                 }
                 .shadow(color: .blue.opacity(0.3), radius: 8, y: 4)
 
-                Button {
-                    vm.startNFCScan()
-                } label: {
-                    Label("Scan via NFC", systemImage: "wave.3.right")
-                        .font(.headline)
-                        .foregroundStyle(.blue)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Color.blue.opacity(0.08))
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                if nfcAvailable {
+                    Button {
+                        vm.startNFCScan()
+                    } label: {
+                        Label("Scan via NFC", systemImage: "wave.3.right")
+                            .font(.headline)
+                            .foregroundStyle(.blue)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(Color.blue.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
                 }
             }
         }
