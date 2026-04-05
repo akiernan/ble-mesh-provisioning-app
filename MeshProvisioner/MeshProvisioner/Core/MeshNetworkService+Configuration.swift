@@ -113,7 +113,7 @@ extension MeshNetworkService {
                 logger.info("🔧 Sending ConfigCompositionDataGet to node 0x\(String(node.primaryUnicastAddress, radix: 16)) (\(node.elements.count) elements, no models)...")
                 let compositionGet = ConfigCompositionDataGet(page: 0)
                 logger.info("🔧 manager.send(CompositionDataGet) — awaiting response...")
-                await sendConfig(compositionGet, to: node)
+                await sendConfigRetrying(compositionGet, to: node)
                 try? await Task.sleep(for: .milliseconds(500))
                 logger.info("🔧 After CompositionDataGet — node elements: \(node.elements.count)")
                 for (i, element) in node.elements.enumerated() {
@@ -126,7 +126,7 @@ extension MeshNetworkService {
 
             logger.info("🔧 Sending ConfigAppKeyAdd to node 0x\(String(node.primaryUnicastAddress, radix: 16))...")
             let request = ConfigAppKeyAdd(applicationKey: appKey)
-            await sendConfig(request, to: node)
+            await sendConfigRetrying(request, to: node)
             try? await Task.sleep(for: .milliseconds(200))
             if let idx = nodeKeyBindingStates.firstIndex(where: { $0.id == node.uuid }) {
                 nodeKeyBindingStates[idx].state = .completed
@@ -160,7 +160,7 @@ extension MeshNetworkService {
                     guard modelId != 0x0000 && modelId != 0x0001 else { continue }
                     if let bindMsg = ConfigModelAppBind(applicationKey: appKey, to: model) {
                         logger.info("🔧 Binding app key to model 0x\(String(modelId, radix: 16)) on element \(i)")
-                        await sendConfig(bindMsg, to: node)
+                        await sendConfigRetrying(bindMsg, to: node)
                         try? await Task.sleep(for: .milliseconds(100))
                     }
                 }
@@ -366,7 +366,7 @@ extension MeshNetworkService {
                        let msg = ConfigModelSubscriptionAdd(group: t.group, to: model) {
                         groupConfigStatus = "Subscribing \(nodeName) to group…"
                         logger.info("🔧 Subscribing model 0x\(String(model.modelId, radix: 16)) to \(t.group.name)")
-                        await sendConfig(msg, to: node)
+                        await sendConfigRetrying(msg, to: node)
                         try? await Task.sleep(for: .milliseconds(200))
                         completedOps += 1
                         groupConfigProgress = Double(completedOps) / Double(totalOps)
@@ -416,12 +416,12 @@ extension MeshNetworkService {
             if !localElements.isEmpty {
                 for model in localElements[0].models where localServerIds.contains(model.modelIdentifier) {
                     if let msg = ConfigModelAppBind(applicationKey: appKey, to: model) {
-                        await sendConfig(msg, to: localNode)
+                        await sendConfigRetrying(msg, to: localNode)
                         completedOps += 1
                         groupConfigProgress = Double(completedOps) / Double(totalOps)
                     }
                     if let msg = ConfigModelSubscriptionAdd(group: mainGroup, to: model) {
-                        await sendConfig(msg, to: localNode)
+                        await sendConfigRetrying(msg, to: localNode)
                         completedOps += 1
                         groupConfigProgress = Double(completedOps) / Double(totalOps)
                     }
@@ -430,12 +430,12 @@ extension MeshNetworkService {
             if localElements.count > 1 {
                 for model in localElements[1].models where localCTLTempServerIds.contains(model.modelIdentifier) {
                     if let msg = ConfigModelAppBind(applicationKey: appKey, to: model) {
-                        await sendConfig(msg, to: localNode)
+                        await sendConfigRetrying(msg, to: localNode)
                         completedOps += 1
                         groupConfigProgress = Double(completedOps) / Double(totalOps)
                     }
                     if let msg = ConfigModelSubscriptionAdd(group: ctlTempGroup, to: model) {
-                        await sendConfig(msg, to: localNode)
+                        await sendConfigRetrying(msg, to: localNode)
                         completedOps += 1
                         groupConfigProgress = Double(completedOps) / Double(totalOps)
                     }
