@@ -57,6 +57,11 @@ extension MeshNetworkService {
             if manager.proxyFilter.proxy != nil { break }
             try? await Task.sleep(for: .milliseconds(100))
         }
+
+        // Bind local client models to the app key so the library can route incoming
+        // app-key-encrypted messages without generating "[Model] ... not bound to key" warnings.
+        await bindLocalClientModelsIfNeeded()
+        _ = manager.save()
     }
 
     @MainActor

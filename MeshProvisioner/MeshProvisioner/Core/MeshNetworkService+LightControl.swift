@@ -44,19 +44,12 @@ extension MeshNetworkService {
 
 extension MeshNetworkService {
 
-    /// Queries a provisioned node for its current on/off and CTL state,
-    /// updating `currentGroup` to reflect the real device values.
-    func fetchCurrentState() async {
-        guard let node = provisionedNodes.first else { return }
+    /// Binds the local GenericOnOff and LightCTL client models to the primary app key
+    /// so NordicMesh can route incoming app-key-encrypted messages without logging
+    /// "[Model] ... not bound to key" warnings. Safe to call multiple times — skips
+    /// models that are already bound.
+    func bindLocalClientModelsIfNeeded() async {
         guard let appKey = manager.meshNetwork?.applicationKeys.first else { return }
-        isFetchingState = true
-        defer { isFetchingState = false }
-
-        // Note: the proxy filter is configured as an empty reject list (= accept all) via
-        // manager.proxyFilter.initialState, so we must NOT call proxyFilter.add() here.
-        // Adding an address to a reject-list filter would BLOCK that address.
-
-        // Bind the app key to local client models (persisted after first run)
         let localElement = manager.localElements.first
         let clientModelIds: [UInt16] = [.genericOnOffClientModelId, .lightCTLClientModelId]
         for modelId in clientModelIds {
@@ -67,6 +60,21 @@ extension MeshNetworkService {
                 }
             }
         }
+    }
+
+    /// Queries a provisioned node for its current on/off and CTL state,
+    /// updating `currentGroup` to reflect the real device values.
+    func fetchCurrentState() async {
+        guard let node = provisionedNodes.first else { return }
+        guard manager.meshNetwork?.applicationKeys.isEmpty == false else { return }
+        isFetchingState = true
+        defer { isFetchingState = false }
+
+        // Note: the proxy filter is configured as an empty reject list (= accept all) via
+        // manager.proxyFilter.initialState, so we must NOT call proxyFilter.add() here.
+        // Adding an address to a reject-list filter would BLOCK that address.
+
+        await bindLocalClientModelsIfNeeded()
         _ = manager.save()
 
         // Query GenericOnOff state from the first provisioned node
@@ -287,12 +295,21 @@ extension MeshNetworkService: MeshNetworkDelegate {
                     self.currentGroup?.lightness = max(rMin, min(rMax, l))
                 }
 
+            case let status as EnOceanProxyConfigStatus:
+                self.handleEnOceanStatus(status, from: source)
+
+            // Config status messages are already resolved via pendingConfigContinuations
+            // at the top of this delegate — no further action needed here.
+            case is ConfigNodeResetStatus,
+                 is ConfigCompositionDataStatus,
+                 is ConfigAppKeyStatus,
+                 is ConfigModelAppStatus,
+                 is ConfigModelSubscriptionStatus,
+                 is ConfigModelPublicationStatus:
+                break
+
             default:
-                if let status = message as? EnOceanProxyConfigStatus {
-                    self.handleEnOceanStatus(status, from: source)
-                } else {
-                    logger.warning("📩 Unhandled message type: \(type(of: message)) opCode=0x\(String(message.opCode, radix: 16))")
-                }
+                logger.warning("📩 Unhandled message type: \(type(of: message)) opCode=0x\(String(message.opCode, radix: 16))")
             }
         }
     }
