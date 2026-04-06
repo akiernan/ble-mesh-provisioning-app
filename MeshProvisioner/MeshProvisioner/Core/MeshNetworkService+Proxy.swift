@@ -94,7 +94,7 @@ extension MeshNetworkService {
     func connectToProxyPeripheral(_ peripheral: CBPeripheral) {
         proxyNodeName = peripheral.name
         logger.info("🔌 Connecting to proxy peripheral: \(peripheral.identifier)")
-        let bearer = GattBearer(targetWithIdentifier: peripheral.identifier)
+        let bearer = GattBearer(target: peripheral)
         bearer.logger = self
         bearer.delegate = self
         bearer.dataDelegate = manager
