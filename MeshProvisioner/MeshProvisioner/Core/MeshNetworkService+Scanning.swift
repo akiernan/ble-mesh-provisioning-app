@@ -41,14 +41,14 @@ extension MeshNetworkService: CBCentralManagerDelegate {
                                      rssi RSSI: NSNumber) {
         // Extract all needed values from non-Sendable advertisementData before Task boundary
         let serviceData = advertisementData[CBAdvertisementDataServiceDataKey] as? [CBUUID: Data]
-        let hasServiceData = serviceData != nil
+        let hasProxyServiceData = serviceData?[MeshProxyService.uuid] != nil
         let meshData = serviceData?[MeshProvisioningService.uuid]
         let localName = advertisementData[CBAdvertisementDataLocalNameKey] as? String
         let rssiValue = RSSI.intValue
 
         Task { @MainActor in
             // Proxy discovery – connect but don't resume until bearer is open
-            if proxyConnectionContinuation != nil, hasServiceData {
+            if proxyConnectionContinuation != nil, hasProxyServiceData {
                 central.stopScan()
                 connectToProxyPeripheral(peripheral)
                 return
