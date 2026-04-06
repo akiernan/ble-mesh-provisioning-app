@@ -6,14 +6,16 @@
 extension MeshNetworkService {
 
     /// Provisions a single device. Returns the provisioned Node on success.
+    ///
+    /// We pass the raw `CBPeripheral` from the scan callback directly to
+    /// `PBGattBearer(target:)`, matching the Nordic example app's approach.
+    /// Using `PBGattBearer(targetWithIdentifier:)` instead causes the bearer's
+    /// fresh internal `CBCentralManager` to call `retrievePeripherals`, which
+    /// rehydrates the peripheral with the daemon's stale GATT cache — the root
+    /// cause of "Device not supported" after a factory reset or SMP session
+    /// (nordicsemi/IOS-nRF-Mesh-Library#289).
     func provisionDevice(_ device: DiscoveredDevice) async throws -> Node {
-        guard let peripheral = scannerCentralManager.retrievePeripherals(
-            withIdentifiers: [device.peripheral.identifier]).first else {
-            // Fallback: use stored peripheral directly
-            return try await provisionWithPeripheral(device: device,
-                                                      peripheral: device.peripheral)
-        }
-        return try await provisionWithPeripheral(device: device, peripheral: peripheral)
+        return try await provisionWithPeripheral(device: device, peripheral: device.peripheral)
     }
 
     func provisionWithPeripheral(device: DiscoveredDevice,
@@ -28,7 +30,7 @@ extension MeshNetworkService {
         )
 
         return try await withCheckedThrowingContinuation { continuation in
-            let bearer = PBGattBearer(targetWithIdentifier: peripheral.identifier)
+            let bearer = PBGattBearer(target: peripheral)
             bearer.logger = self
 
             do {
