@@ -127,24 +127,29 @@ extension EnOceanNFCReader: NFCTagReaderSessionDelegate {
 
     nonisolated func tagReaderSession(_ session: NFCTagReaderSession, didDetect tags: [NFCTag]) {
         guard let tag = tags.first else { return }
+        // Check tag type before connecting — NFCTag type is known from advertisement.
+        guard case .miFare(let mifareTag) = tag else {
+            session.invalidate(errorMessage: "Unsupported tag type. Please use an EnOcean PTM216B switch.")
+            Task { @MainActor in
+                self.continuation?.resume(throwing: EnOceanNFCError.unsupportedTag)
+                self.continuation = nil
+            }
+            return
+        }
+        // Wrap session to safely cross the @Sendable closure boundary.
+        // Safe because CoreNFC serialises all session callbacks on its own queue.
+        struct SendableSession: @unchecked Sendable { let value: NFCTagReaderSession }
+        let sendableSession = SendableSession(value: session)
+        let sendableTag = SendableMiFareTag(tag: mifareTag)
         session.connect(to: tag) { [weak self] error in
             if let error {
-                session.invalidate(errorMessage: "Connection failed.")
+                sendableSession.value.invalidate(errorMessage: "Connection failed.")
                 Task { @MainActor in
                     self?.continuation?.resume(throwing: EnOceanNFCError.connectionFailed(error))
                     self?.continuation = nil
                 }
                 return
             }
-            guard case .miFare(let mifareTag) = tag else {
-                session.invalidate(errorMessage: "Unsupported tag type. Please use an EnOcean PTM216B switch.")
-                Task { @MainActor in
-                    self?.continuation?.resume(throwing: EnOceanNFCError.unsupportedTag)
-                    self?.continuation = nil
-                }
-                return
-            }
-            let sendableTag = SendableMiFareTag(tag: mifareTag)
             Task { @MainActor in
                 await self?.process(tag: sendableTag)
             }
