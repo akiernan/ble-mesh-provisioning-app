@@ -213,6 +213,10 @@ final class MeshNetworkService: NSObject {
     func factoryResetAllNodes() async {
         // Reset the proxy node last so we keep the BLE connection until all other
         // nodes have been reset (resetting the proxy first would drop the bearer).
+        // Suppress auto-reconnect for the duration of factory reset so that when the
+        // proxy bearer closes (after the proxy node resets last), we don't race against
+        // the provisioning scan with a stale proxyConnectionContinuation.
+        suppressAutoReconnect = true
         let proxyNode = manager.proxyFilter.proxy
         let nodes = provisionedNodes.sorted { _, b in b === proxyNode }
         isResettingNodes = true
@@ -238,6 +242,7 @@ final class MeshNetworkService: NSObject {
         isConnectedToProxy = false
         proxyConnectionContinuation?.resume(throwing: AppError.networkNotReady)
         proxyConnectionContinuation = nil
+        suppressAutoReconnect = false
 
         // Stop scanning
         scannerCentralManager.stopScan()
