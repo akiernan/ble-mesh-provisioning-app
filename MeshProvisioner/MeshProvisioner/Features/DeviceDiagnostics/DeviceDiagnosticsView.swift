@@ -71,13 +71,19 @@ struct DeviceDiagnosticsView: View {
             if pendingOTAData != nil { showOTAAlert = true }
         }
         .alert("Start OTA Update?", isPresented: $showOTAAlert) {
-            Button("Update", role: .destructive) {
+            Button("Bootloader (faster)") {
                 guard let data = pendingOTAData else { return }
+                pendingOTAData = nil
+                Task { await vm.startOTAViaBootloader(data: data) }
+            }
+            Button("Direct (slower)") {
+                guard let data = pendingOTAData else { return }
+                pendingOTAData = nil
                 Task { await vm.startOTA(data: data) }
             }
             Button("Cancel", role: .cancel) { pendingOTAData = nil }
         } message: {
-            Text("This will upload the selected firmware and reboot the device.")
+            Text("Reboot into bootloader first for a faster upload, or upload directly without rebooting.")
         }
         .alert("Soft Reset", isPresented: $showSoftResetAlert) {
             Button("Reset", role: .destructive) { Task { await vm.softReset() } }
@@ -218,7 +224,14 @@ struct DeviceDiagnosticsView: View {
             cardHeader(title: "OTA Update", systemImage: "arrow.down.circle") { EmptyView() }
             Divider()
             VStack(alignment: .leading, spacing: 12) {
-                if case .uploading(let progress) = vm.currentOperation {
+                if case .resettingToBootloader = vm.currentOperation {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("Rebooting into bootloader…")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                } else if case .uploading(let progress) = vm.currentOperation {
                     VStack(alignment: .leading, spacing: 6) {
                         ProgressView(value: progress)
                             .tint(.blue)

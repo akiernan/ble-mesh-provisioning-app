@@ -244,6 +244,11 @@ final class DeviceDiagnosticsViewModel: NSObject {
         currentOperation = .none
     }
 
+    func startOTAViaBootloader(data: Data) async {
+        await resetToBootloader()
+        await startOTA(data: data)
+    }
+
     func startOTA(data: Data) async {
         diagLogger.info("startOTA() — \(data.count) bytes, disconnecting proxy for full MTU")
         currentOperation = .uploading(progress: 0)
