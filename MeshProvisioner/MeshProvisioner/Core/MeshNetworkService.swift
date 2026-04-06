@@ -211,7 +211,10 @@ final class MeshNetworkService: NSObject {
     /// Sends ConfigNodeReset to every provisioned node (so they return to
     /// unprovisioned state and can be discovered again), then wipes local state.
     func factoryResetAllNodes() async {
-        let nodes = provisionedNodes
+        // Reset the proxy node last so we keep the BLE connection until all other
+        // nodes have been reset (resetting the proxy first would drop the bearer).
+        let proxyNode = manager.proxyFilter.proxy
+        let nodes = provisionedNodes.sorted { _, b in b === proxyNode }
         isResettingNodes = true
         nodeResetTotal = nodes.count
         nodeResetCompleted = 0
