@@ -9,6 +9,7 @@ enum AppRoute: Hashable {
     case groupConfig
     case switchCommissioning
     case deviceControl
+    case deviceDiagnostics(UInt16)
 }
 
 // MARK: - AppRouter

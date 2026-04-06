@@ -33,6 +33,7 @@ final class MeshNetworkService: NSObject {
 
     var meshNetwork: MeshNetwork? { manager.meshNetwork }
     var isConnectedToProxy = false
+    var proxyNodeName: String? = nil
     var isFetchingState = false
     var currentGroup: MeshGroupConfig?
     var error: Error?
@@ -86,6 +87,7 @@ final class MeshNetworkService: NSObject {
     // Proxy connection
     var proxyBearer: GattBearer?
     var proxyConnectionContinuation: CheckedContinuation<Void, Error>?
+    var suppressAutoReconnect = false
 
     // MARK: Init
 

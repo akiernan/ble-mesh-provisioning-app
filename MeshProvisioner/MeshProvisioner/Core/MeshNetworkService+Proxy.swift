@@ -64,8 +64,35 @@ extension MeshNetworkService {
         _ = manager.save()
     }
 
+    /// Closes the current proxy bearer without triggering auto-reconnect.
+    /// Call this before a direct SMP/OTA session that needs full BLE bandwidth.
+    ///
+    /// Also stops the scanner and cancels any pending connection continuation so
+    /// that if the target device is the active proxy node, it cannot be
+    /// re-selected as a proxy while the SMP/OTA session is in progress.
+    @MainActor
+    func disconnectProxy() {
+        suppressAutoReconnect = true
+        scannerCentralManager.stopScan()
+        // Cancel any in-flight connectToProxy() wait so it doesn't race with the
+        // explicit reconnect the caller will issue after the SMP session ends.
+        if let cont = proxyConnectionContinuation {
+            proxyConnectionContinuation = nil
+            cont.resume(throwing: AppError.messageSendFailed("Proxy scan cancelled for SMP session"))
+        }
+        guard let bearer = proxyBearer else { return }
+        bearer.close()
+    }
+
+    /// Re-enables auto-reconnect after a direct SMP/OTA session.
+    @MainActor
+    func resumeAutoReconnect() {
+        suppressAutoReconnect = false
+    }
+
     @MainActor
     func connectToProxyPeripheral(_ peripheral: CBPeripheral) {
+        proxyNodeName = peripheral.name
         logger.info("🔌 Connecting to proxy peripheral: \(peripheral.identifier)")
         let bearer = GattBearer(targetWithIdentifier: peripheral.identifier)
         bearer.logger = self
@@ -103,6 +130,7 @@ extension MeshNetworkService: BearerDelegate {
             if bearer === proxyBearer {
                 isConnectedToProxy = false
                 proxyBearer = nil
+                proxyNodeName = nil
                 manager.transmitter = nil
                 logger.info("🔴 Proxy bearer CLOSED — error: \(error?.localizedDescription ?? "none")")
                 // If we were still waiting on connection, report the failure
@@ -110,7 +138,7 @@ extension MeshNetworkService: BearerDelegate {
                     proxyConnectionContinuation = nil
                     cont.resume(throwing: error ?? AppError.messageSendFailed(
                         "Proxy connection closed"))
-                } else if hasProvisionedNetwork {
+                } else if hasProvisionedNetwork && !suppressAutoReconnect {
                     // Auto-reconnect if we have a provisioned network, then refresh state
                     logger.info("Auto-reconnecting to proxy...")
                     Task {

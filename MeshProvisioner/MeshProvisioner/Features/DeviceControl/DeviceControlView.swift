@@ -335,30 +335,38 @@ struct DeviceControlView: View {
 
             if showDevices {
                 VStack(spacing: 8) {
-                    ForEach(Array(vm.deviceNames.enumerated()), id: \.0) { _, name in
-                        HStack(spacing: 12) {
-                            Image(systemName: vm.group?.isOn == true ? "circle.fill" : "circle")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(vm.group?.isOn == true ? Color.green : Color(.systemGray3))
-                                .accessibilityHidden(true)
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(name).font(.subheadline).fontWeight(.medium)
+                    ForEach(Array(vm.provisionedDevices.enumerated()), id: \.0) { _, device in
+                        Button {
+                            router.navigate(to: .deviceDiagnostics(device.unicastAddress))
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: vm.group?.isOn == true ? "circle.fill" : "circle")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(vm.group?.isOn == true ? Color.green : Color(.systemGray3))
+                                    .accessibilityHidden(true)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(device.name).font(.subheadline).fontWeight(.medium)
+                                }
+                                Spacer()
+                                Text("Connected")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(.green)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.green.opacity(0.1))
+                                    .clipShape(Capsule())
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
-                            Spacer()
-                            Text("Connected")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundStyle(.green)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.green.opacity(0.1))
-                                .clipShape(Capsule())
                         }
+                        .buttonStyle(.plain)
                         .padding(12)
                         .background(Color(.secondarySystemBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                         .accessibilityElement(children: .ignore)
-                        .accessibilityLabel("\(name), Connected, \(vm.group?.isOn == true ? "On" : "Off")")
+                        .accessibilityLabel("\(device.name), Connected, \(vm.group?.isOn == true ? "On" : "Off")")
                     }
                 }
                 .padding(.horizontal, 16)

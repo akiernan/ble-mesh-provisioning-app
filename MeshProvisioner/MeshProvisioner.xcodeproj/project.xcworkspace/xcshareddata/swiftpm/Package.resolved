@@ -1,5 +1,5 @@
 {
-  "originHash" : "1357c25ea1ea92f6c0f99500d28e40535d7b1d9c97ef90388f390d6a434929ae",
+  "originHash" : "5ca8442c13430a673734c8c3c4073b3c5ac724d8faaea98444b8cdc3eefe003c",
   "pins" : [
     {
       "identity" : "cryptoswift",
@@ -11,12 +11,66 @@
       }
     },
     {
+      "identity" : "ios-ble-library",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/NordicSemiconductor/IOS-BLE-Library",
+      "state" : {
+        "revision" : "f610daf7cdb1b0e1a5eaac19917db906221b8102",
+        "version" : "0.4.4"
+      }
+    },
+    {
+      "identity" : "ios-common-libraries",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/nordicsemi/IOS-Common-Libraries",
+      "state" : {
+        "revision" : "318fbcbcf640ae9b4a3e5917077730f5e350fcbd",
+        "version" : "0.2.2"
+      }
+    },
+    {
+      "identity" : "ios-corebluetooth-mock",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/NordicSemiconductor/IOS-CoreBluetooth-Mock.git",
+      "state" : {
+        "revision" : "477998d850a2233e05d1941ed0b5a2385da8cf4d",
+        "version" : "1.0.4"
+      }
+    },
+    {
+      "identity" : "ios-nrf-connect-device-manager",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/NordicSemiconductor/IOS-nRF-Connect-Device-Manager",
+      "state" : {
+        "revision" : "81bad91508b4b1e401d40569fcfa203eb66d91b5",
+        "version" : "1.14.2"
+      }
+    },
+    {
       "identity" : "ios-nrf-mesh-library",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/NordicSemiconductor/IOS-nRF-Mesh-Library",
       "state" : {
         "revision" : "ae3a3a4762b44a9b05ddee3ab2d0164dae073443",
         "version" : "4.8.0"
+      }
+    },
+    {
+      "identity" : "swiftcbor",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/valpackett/SwiftCBOR.git",
+      "state" : {
+        "revision" : "04ccff117f6549121d5721ec84fdf0162122b90e",
+        "version" : "0.5.0"
+      }
+    },
+    {
+      "identity" : "zipfoundation",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/weichsel/ZIPFoundation.git",
+      "state" : {
+        "revision" : "02b6abe5f6eef7e3cbd5f247c5cc24e246efcfe0",
+        "version" : "0.9.19"
       }
     }
   ],

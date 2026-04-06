@@ -25,8 +25,8 @@ final class DeviceControlViewModel {
     var group: MeshGroupConfig? { meshService.currentGroup }
     var isConnected: Bool { meshService.isConnectedToProxy }
     var deviceCount: Int { meshService.provisionedNodes.count }
-    var deviceNames: [String] {
-        meshService.provisionedNodes.map { $0.name ?? "Mesh Node" }
+    var provisionedDevices: [(name: String, unicastAddress: UInt16)] {
+        meshService.provisionedNodes.map { ($0.name ?? "Mesh Node", $0.primaryUnicastAddress) }
     }
 
     var isResetting: Bool { meshService.isResettingNodes }

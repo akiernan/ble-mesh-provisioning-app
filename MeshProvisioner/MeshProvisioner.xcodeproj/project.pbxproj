@@ -10,6 +10,9 @@
 		5A3B0F332F8177C100F6A744 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5A3B0F322F81768A00F6A744 /* Assets.xcassets */; };
 		5AF470892F812E5B00105C17 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 5AF470882F812E5B00105C17 /* AppIcon.icon */; };
 		AAAA00000000000000000011 /* NordicMesh in Frameworks */ = {isa = PBXBuildFile; productRef = AAAA00000000000000000010 /* NordicMesh */; };
+		AAAA00000000000000000152 /* iOSMcuManagerLibrary in Frameworks */ = {isa = PBXBuildFile; productRef = AAAA00000000000000000151 /* iOSMcuManagerLibrary */; };
+		AAAA00000000000000000154 /* DeviceDiagnosticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000153 /* DeviceDiagnosticsView.swift */; };
+		AAAA00000000000000000156 /* DeviceDiagnosticsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000155 /* DeviceDiagnosticsViewModel.swift */; };
 		AAAA00000000000000000101 /* MeshProvisionerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000100 /* MeshProvisionerApp.swift */; };
 		AAAA00000000000000000103 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000102 /* AppRouter.swift */; };
 		AAAA00000000000000000105 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA00000000000000000104 /* Models.swift */; };
@@ -74,6 +77,8 @@
 		AAAA00000000000000000135 /* MeshProvisioner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MeshProvisioner.entitlements; sourceTree = "<group>"; };
 		AAAA00000000000000000136 /* EnOceanQRParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnOceanQRParser.swift; sourceTree = "<group>"; };
 		AAAA00000000000000000138 /* QRScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRScannerView.swift; sourceTree = "<group>"; };
+		AAAA00000000000000000153 /* DeviceDiagnosticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceDiagnosticsView.swift; sourceTree = "<group>"; };
+		AAAA00000000000000000155 /* DeviceDiagnosticsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceDiagnosticsViewModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -82,6 +87,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AAAA00000000000000000011 /* NordicMesh in Frameworks */,
+				AAAA00000000000000000152 /* iOSMcuManagerLibrary in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -144,6 +150,7 @@
 				AAAA00000000000000000206 /* GroupConfig */,
 				AAAA00000000000000000209 /* SwitchCommissioning */,
 				AAAA00000000000000000207 /* DeviceControl */,
+				AAAA0000000000000000020A /* DeviceDiagnostics */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -203,6 +210,15 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
+		AAAA0000000000000000020A /* DeviceDiagnostics */ = {
+			isa = PBXGroup;
+			children = (
+				AAAA00000000000000000153 /* DeviceDiagnosticsView.swift */,
+				AAAA00000000000000000155 /* DeviceDiagnosticsViewModel.swift */,
+			);
+			path = DeviceDiagnostics;
+			sourceTree = "<group>";
+		};
 		AAAA00000000000000000209 /* SwitchCommissioning */ = {
 			isa = PBXGroup;
 			children = (
@@ -234,6 +250,7 @@
 			name = MeshProvisioner;
 			packageProductDependencies = (
 				AAAA00000000000000000010 /* NordicMesh */,
+				AAAA00000000000000000151 /* iOSMcuManagerLibrary */,
 			);
 			productName = MeshProvisioner;
 			productReference = AAAA0000000000000000000E /* MeshProvisioner.app */;
@@ -266,6 +283,7 @@
 			mainGroup = AAAA0000000000000000000C /* MeshProvisioner */;
 			packageReferences = (
 				AAAA0000000000000000000F /* XCRemoteSwiftPackageReference "IOS-nRF-Mesh-Library" */,
+				AAAA00000000000000000150 /* XCRemoteSwiftPackageReference "IOS-nRF-Connect-Device-Manager" */,
 			);
 			productRefGroup = AAAA0000000000000000000D /* Products */;
 			projectDirPath = "";
@@ -321,6 +339,8 @@
 				AAAA00000000000000000132 /* SwitchCommissioningView.swift in Sources */,
 				AAAA00000000000000000137 /* EnOceanQRParser.swift in Sources */,
 				AAAA00000000000000000139 /* QRScannerView.swift in Sources */,
+				AAAA00000000000000000154 /* DeviceDiagnosticsView.swift in Sources */,
+				AAAA00000000000000000156 /* DeviceDiagnosticsViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -533,6 +553,14 @@
 				minimumVersion = 4.0.0;
 			};
 		};
+		AAAA00000000000000000150 /* XCRemoteSwiftPackageReference "IOS-nRF-Connect-Device-Manager" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/NordicSemiconductor/IOS-nRF-Connect-Device-Manager";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -540,6 +568,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = AAAA0000000000000000000F /* XCRemoteSwiftPackageReference "IOS-nRF-Mesh-Library" */;
 			productName = NordicMesh;
+		};
+		AAAA00000000000000000151 /* iOSMcuManagerLibrary */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AAAA00000000000000000150 /* XCRemoteSwiftPackageReference "IOS-nRF-Connect-Device-Manager" */;
+			productName = iOSMcuManagerLibrary;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -22,6 +22,8 @@ struct MeshProvisionerApp: App {
                             SwitchCommissioningView()
                         case .deviceControl:
                             DeviceControlView()
+                        case .deviceDiagnostics(let unicastAddress):
+                            DeviceDiagnosticsView(unicastAddress: unicastAddress)
                         }
                     }
             }
