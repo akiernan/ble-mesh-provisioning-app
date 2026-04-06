@@ -210,7 +210,6 @@ final class DeviceDiagnosticsViewModel: NSObject {
 
         disconnect()
         currentOperation = .reconnecting
-        meshService.resumeAutoReconnect()
         // Normal-mode boot (full ESP-IDF + mesh stack) takes longer than bootloader.
         try? await Task.sleep(for: .milliseconds(3000))
         try? await meshService.connectToProxy()
@@ -250,19 +249,15 @@ final class DeviceDiagnosticsViewModel: NSObject {
     }
 
     func startOTA(data: Data) async {
-        diagLogger.info("startOTA() — \(data.count) bytes, disconnecting proxy for full MTU")
+        diagLogger.info("startOTA() — \(data.count) bytes")
         currentOperation = .uploading(progress: 0)
         errorMessage = nil
-
-        meshService.disconnectProxy()
-        try? await Task.sleep(for: .milliseconds(300))
 
         if case .connected = connectionState {} else { await connect() }
         guard case .connected = connectionState, let t = transport else {
             diagLogger.error("startOTA() — SMP connection failed")
             errorMessage = "Could not connect to device for OTA"
             currentOperation = .none
-            meshService.resumeAutoReconnect()
             return
         }
 
@@ -294,7 +289,6 @@ final class DeviceDiagnosticsViewModel: NSObject {
 
         disconnect()
         currentOperation = .reconnecting
-        meshService.resumeAutoReconnect()
         try? await Task.sleep(for: .milliseconds(3000))
         try? await meshService.connectToProxy()
         diagLogger.info("startOTA() done — proxy reconnected")

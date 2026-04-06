@@ -64,32 +64,6 @@ extension MeshNetworkService {
         _ = manager.save()
     }
 
-    /// Closes the current proxy bearer without triggering auto-reconnect.
-    /// Call this before a direct SMP/OTA session that needs full BLE bandwidth.
-    ///
-    /// Also stops the scanner and cancels any pending connection continuation so
-    /// that if the target device is the active proxy node, it cannot be
-    /// re-selected as a proxy while the SMP/OTA session is in progress.
-    @MainActor
-    func disconnectProxy() {
-        suppressAutoReconnect = true
-        scannerCentralManager.stopScan()
-        // Cancel any in-flight connectToProxy() wait so it doesn't race with the
-        // explicit reconnect the caller will issue after the SMP session ends.
-        if let cont = proxyConnectionContinuation {
-            proxyConnectionContinuation = nil
-            cont.resume(throwing: AppError.messageSendFailed("Proxy scan cancelled for SMP session"))
-        }
-        guard let bearer = proxyBearer else { return }
-        bearer.close()
-    }
-
-    /// Re-enables auto-reconnect after a direct SMP/OTA session.
-    @MainActor
-    func resumeAutoReconnect() {
-        suppressAutoReconnect = false
-    }
-
     @MainActor
     func connectToProxyPeripheral(_ peripheral: CBPeripheral) {
         proxyNodeName = peripheral.name
@@ -100,9 +74,7 @@ extension MeshNetworkService {
         bearer.dataDelegate = manager
         proxyBearer = bearer
         manager.transmitter = bearer
-        logger.info("🔌 Bearer delegate: \(bearer.delegate != nil), dataDelegate: \(bearer.dataDelegate != nil), transmitter: \(self.manager.transmitter != nil)")
         bearer.open()
-        logger.info("🔌 Bearer.open() called")
     }
 }
 
@@ -114,13 +86,11 @@ extension MeshNetworkService: BearerDelegate {
         Task { @MainActor in
             if bearer === proxyBearer {
                 isConnectedToProxy = true
-                logger.info("🟢 Proxy bearer OPENED — bearer type: \(type(of: bearer)), transmitter set: \(self.manager.transmitter != nil)")
+                logger.info("🟢 Proxy bearer opened")
                 if let cont = proxyConnectionContinuation {
                     proxyConnectionContinuation = nil
                     cont.resume()
                 }
-            } else {
-                logger.info("🟢 Bearer opened but NOT proxy bearer (type: \(type(of: bearer)))")
             }
         }
     }
