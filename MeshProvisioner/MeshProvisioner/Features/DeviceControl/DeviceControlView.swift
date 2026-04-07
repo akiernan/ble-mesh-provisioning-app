@@ -347,6 +347,11 @@ struct DeviceControlView: View {
                                 VStack(alignment: .leading, spacing: 1) {
                                     Text(device.name).font(.subheadline).fontWeight(.medium)
                                 }
+                                if meshService.proxyNodeName == device.name {
+                                    Image(systemName: "antenna.radiowaves.left.and.right")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
                                 Spacer()
                                 Text("Connected")
                                     .font(.caption)
