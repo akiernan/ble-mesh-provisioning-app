@@ -275,13 +275,7 @@ final class DeviceDiagnosticsViewModel: NSObject {
                 self.upgradeContinuation = continuation
                 dfuManager.start(images: [image], using: config)
             }
-            diagLogger.info("startOTA() — upload complete, sending reset")
-            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-                defaultManager?.reset(bootMode: .normal) { _, error in
-                    if let error { diagLogger.error("startOTA reset error: \(error.localizedDescription, privacy: .public)") }
-                    Task { @MainActor in cont.resume() }
-                }
-            }
+            diagLogger.info("startOTA() — upload complete")
         } catch {
             diagLogger.error("startOTA() failed: \(error.localizedDescription, privacy: .public)")
             errorMessage = error.localizedDescription
