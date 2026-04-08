@@ -73,7 +73,7 @@ extension MeshNetworkService {
 
     func handleBearerDidOpen(deviceID: UUID, pm: ProvisioningManager) {
         do {
-            try pm.identify(andAttractFor: 0)
+            try pm.identify(andAttractFor: 5)
         } catch {
             finishProvisioning(id: deviceID,
                                result: .failure(AppError.provisioningFailed(error.localizedDescription)))
