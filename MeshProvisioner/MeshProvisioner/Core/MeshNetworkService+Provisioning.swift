@@ -29,6 +29,11 @@ extension MeshNetworkService {
             oobInformation: oobInfo(from: storedMeshData)
         )
 
+        // Cancel any lingering connection so the bearer gets a fresh GATT
+        // service discovery rather than iOS returning a stale cached service
+        // list from a previous mode (e.g. proxy → unprovisioned after reset).
+        scannerCentralManager.cancelPeripheralConnection(peripheral)
+
         return try await withCheckedThrowingContinuation { continuation in
             let bearer = PBGattBearer(target: peripheral)
             bearer.logger = self

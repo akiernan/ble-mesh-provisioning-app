@@ -66,6 +66,9 @@ extension MeshNetworkService {
 
     @MainActor
     func connectToProxyPeripheral(_ peripheral: CBPeripheral) {
+        // Cancel any lingering connection for the same reason as provisioning —
+        // forces a fresh GATT discovery on reconnect if the device changed mode.
+        scannerCentralManager.cancelPeripheralConnection(peripheral)
         proxyNodeName = peripheral.name
         logger.info("🔌 Connecting to proxy peripheral: \(peripheral.identifier)")
         let bearer = GattBearer(target: peripheral)
