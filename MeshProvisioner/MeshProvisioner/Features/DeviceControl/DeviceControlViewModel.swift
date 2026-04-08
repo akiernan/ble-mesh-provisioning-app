@@ -86,6 +86,13 @@ final class DeviceControlViewModel {
         }
     }
 
+    func resetLocalOnly() {
+        Task {
+            meshService.resetMeshNetwork()
+            router.popToRoot()
+        }
+    }
+
     // MARK: - ACK-gated Send
 
     private func triggerSendIfIdle() {

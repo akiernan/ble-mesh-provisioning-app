@@ -37,9 +37,13 @@ struct DeviceControlView: View {
                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                 viewModel?.restart()
             }
+            Button("Reset Local Only", role: .destructive) {
+                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                viewModel?.resetLocalOnly()
+            }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This will delete all provisioned devices and start over. The devices will need to be re-provisioned.")
+            Text("Reset all devices and local state, or reset local state only if devices have already been reset.")
         }
     }
 
