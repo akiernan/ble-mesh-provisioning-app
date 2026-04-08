@@ -234,12 +234,8 @@ final class DeviceDiagnosticsViewModel: NSObject {
             }
         }
 
-        diagLogger.info("resetToBootloader() done — waiting for device to enter DFU mode")
+        diagLogger.info("resetToBootloader() done — device rebooting into DFU mode")
         disconnect()
-        // Give the device time to reboot into bootloader before scanning.
-        // The device advertises as "DFU:<nodeName>"; scanForDevice() strips the prefix.
-        try? await Task.sleep(for: .milliseconds(1500))
-        await connect()
         currentOperation = .none
     }
 
